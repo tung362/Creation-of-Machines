@@ -19,9 +19,11 @@ public class HouseBuilder : MonoBehaviour
 
     private HouseFloor CurrentFloor;
 
+    //Grid origin and parent object for the house
     private GameObject GridOrigin;
 
     private HashSet<Vector3Int> VisitedTiles = new HashSet<Vector3Int>();
+    private HashSet<Vector3Int> UngroundedTiles = new HashSet<Vector3Int>();
 
     void Start()
     {
@@ -136,18 +138,13 @@ public class HouseBuilder : MonoBehaviour
         }
     }
 
-    void SelectTile()
-    {
-
-    }
-
     void CreateGridTile(Vector3Int tileCoord)
     {
         //New floor
         if(!HouseFloors.ContainsKey(tileCoord.y))
         {
-            if(HouseFloors.Count == 0) HouseFloors.Add(tileCoord.y, new HouseFloor(OuterStyleType));
-            else HouseFloors.Add(tileCoord.y, new HouseFloor(HouseFloors[tileCoord.y - 2].StyleType));
+            if(HouseFloors.ContainsKey(tileCoord.y - 2)) HouseFloors.Add(tileCoord.y, new HouseFloor(HouseFloors[tileCoord.y - 2].StyleType));
+            else HouseFloors.Add(tileCoord.y, new HouseFloor(OuterStyleType));
         }
 
         if (!HouseFloors[tileCoord.y].GridTiles.ContainsKey(tileCoord))
@@ -267,27 +264,22 @@ public class HouseBuilder : MonoBehaviour
                 //If tile hasn't been visited
                 if (!VisitedTiles.Contains(gridTileCoord)) CheckAdjacentTiles(gridTileCoord, ref VisitedTiles);
             }
+
+            //Search for tiles unconnected to the ground
+            foreach (HouseFloor floor in HouseFloors.Values)
+            {
+                foreach (Vector3Int gridTileCoord in floor.GridTiles.Keys)
+                {
+                    if (!VisitedTiles.Contains(gridTileCoord)) UngroundedTiles.Add(gridTileCoord);
+                }
+            }
         }
     }
 
     void DestroyFloatingTiles()
     {
-        //Checks if ground floor exists
-        if (HouseFloors.ContainsKey(0))
-        {
-            //Search for tiles unconnected to the ground
-            HashSet<Vector3Int> ungroundedTiles = new HashSet<Vector3Int>();
-            foreach (HouseFloor floor in HouseFloors.Values)
-            {
-                foreach(Vector3Int gridTileCoord in floor.GridTiles.Keys)
-                {
-                    if(!VisitedTiles.Contains(gridTileCoord)) ungroundedTiles.Add(gridTileCoord);
-                }
-            }
-
-            //Destroy unconnected tiles
-            foreach(Vector3Int gridTileCoord in ungroundedTiles) DestroyGridTile(gridTileCoord);
-        }
+        //Destroy unconnected tiles
+        foreach (Vector3Int gridTileCoord in UngroundedTiles) DestroyGridTile(gridTileCoord);
     }
 
     void CheckAdjacentTiles(Vector3Int tileCoord, ref HashSet<Vector3Int> visitedTiles)
@@ -299,15 +291,93 @@ public class HouseBuilder : MonoBehaviour
         }
     }
 
-    void PreFinalizeBuild()
+    void CreateCentroidPivot()
     {
-        CheckForFloatingTiles();
+        if(GridOrigin)
+        {
+            float xSum = 0;
+            float zSum = 0;
+            int count = 0;
+            HashSet<Vector3Int> uniqueFlattenCoords = new HashSet<Vector3Int>();
+            foreach (HouseFloor floor in HouseFloors.Values)
+            {
+                foreach (Vector3Int gridTileCoord in floor.GridTiles.Keys)
+                {
+                    Vector3Int flattenCoord = new Vector3Int(gridTileCoord.x, 0, gridTileCoord.z);
+                    if (!uniqueFlattenCoords.Contains(flattenCoord))
+                    {
+                        xSum += (gridTileCoord.x * 0.5f) * SnapOffset;
+                        zSum += (gridTileCoord.z * 0.5f) * SnapOffset;
+                        count += 1;
+                        uniqueFlattenCoords.Add(flattenCoord);
+                    }
+                }
+            }
+
+            if(count != 0)
+            {
+                GameObject centroidPivot = new GameObject("House");
+                centroidPivot.transform.position = GridOrigin.transform.TransformPoint(new Vector3(xSum / count, 0, zSum / count));
+                centroidPivot.transform.rotation = GridOrigin.transform.rotation;
+                GridOrigin.transform.SetParent(centroidPivot.transform);
+                centroidPivot.AddComponent<BoxCollider>();
+                CalculateBounds(centroidPivot);
+            }
+        }
     }
 
-    void FinalizeBuild()
+    void CalculateBounds(GameObject parent)
     {
-        //Check if empty then delete the finalized building
-        //Check for floating pieces and delete if there is any
+        BoxCollider collider = parent.GetComponent<BoxCollider>();
+        if (collider)
+        {
+            Bounds bounds = new Bounds(parent.transform.position, Vector3.zero);
+
+            //Rotates house back to default rotation so bounds can be Encapsulated accurately
+            Vector3 previousEulerAngles = parent.transform.eulerAngles;
+            parent.transform.eulerAngles = Vector3.zero;
+
+            //Todo: use sub grid instead
+            foreach (HouseFloor floor in HouseFloors.Values)
+            {
+                foreach (GridTile gridTileCoord in floor.GridTiles.Values) bounds.Encapsulate(gridTileCoord.Tile.GetComponent<Renderer>().bounds);
+            }
+            collider.center = parent.transform.InverseTransformPoint(bounds.center);
+            collider.size = bounds.size;
+
+            //Rotates house back to it's assigned rotation prior to calculations since Encapsulated has been accurately calculated
+            parent.transform.eulerAngles = previousEulerAngles;
+        }
+        else Debug.Log("Warning! Missing BoxCollider for " + parent.name + ". Could not Calculate bounds");
+    }
+
+    public void CreateNewHouse()
+    {
+
+    }
+
+    void SelectHouseToEdit()
+    {
+
+    }
+
+    //Run before calling FinalizeBuild()
+    public void PreFinalizeBuild()
+    {
+        VisitedTiles.Clear();
+        UngroundedTiles.Clear();
+
+        CheckForFloatingTiles();
+        if(UngroundedTiles.Count > 0)
+        {
+            //Invoke event to enable UI
+        }
+    }
+
+    //Run after calling PreFinalizeBuild();
+    public void FinalizeBuild()
+    {
         DestroyFloatingTiles();
+        if(HouseFloors.ContainsKey(0)) CreateCentroidPivot();
     }
 }
