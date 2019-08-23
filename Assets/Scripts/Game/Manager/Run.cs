@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+//Game manager, keeps track of all registries
 public class Run : MonoBehaviour
 {
     public static Run instance { get; private set; }

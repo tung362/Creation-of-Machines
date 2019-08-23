@@ -40,6 +40,13 @@ public enum OuterHouseTileType
     InnerCorner
 }
 
+public enum PlacementType
+{
+    Normal,
+    Floor,
+    Ceiling
+}
+
 [System.Serializable]
 public class HouseFloor
 {
@@ -57,13 +64,14 @@ public class HouseFloor
 public class GridTile
 {
     public GameObject Tile;
+    public bool IsFloor;
     public HashSet<Vector3Int> AdjacentTiles = new HashSet<Vector3Int>();
 }
 
 [System.Serializable]
 public class GridSubTile
 {
-    public GameObject Tile;
+    public List<GameObject> Tiles = new List<GameObject>();
     public string TileData;
 
     public GridSubTile(string newTileData)
@@ -76,20 +84,22 @@ public class GridSubTile
 public class GridPattern
 {
     public string PatternData;
-    public int TileType;
+    public int[] TileTypes;
 }
 
 [System.Serializable]
 public class GridPatternVarient
 {
-    public int TileType;
+    public int[] TileTypes;
     public bool Invert;
     public bool Rotate;
+    public float RotationAngle;
 
-    public GridPatternVarient(int newTileType, bool shouldInvert, bool shouldRotate)
+    public GridPatternVarient(int[] newTileTypes, bool shouldInvert, bool shouldRotate, float newRotationAngle)
     {
-        TileType = newTileType;
+        TileTypes = newTileTypes;
         Invert = shouldInvert;
         Rotate = shouldRotate;
+        RotationAngle = newRotationAngle;
     }
 }

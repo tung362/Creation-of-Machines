@@ -24,6 +24,7 @@ public class PlacementCamera : MonoBehaviour
     public bool Reflection = true;
     public bool DepthOfField = true;
     public bool Fog = true;
+    public LayerMask ElevationMask;
 
     [Header("Reflection Probe")]
     public ReflectionProbe Probe;
@@ -87,8 +88,8 @@ public class PlacementCamera : MonoBehaviour
         RaycastHit cameraHit;
         float centerElevation = -int.MaxValue;
         float cameraElevation = -int.MaxValue;
-        if (Physics.Raycast(new Vector3(Center.transform.position.x, CameraElevationHeightCheck, Center.transform.position.z), Vector3.down, out centerHit)) centerElevation = centerHit.point.y;
-        if (Physics.Raycast(new Vector3(transform.position.x, CameraElevationHeightCheck, transform.position.z), Vector3.down, out cameraHit)) cameraElevation = cameraHit.point.y;
+        if (Physics.Raycast(new Vector3(Center.transform.position.x, Center.transform.position.y + CameraElevationHeightCheck, Center.transform.position.z), Vector3.down, out centerHit, Mathf.Infinity, ElevationMask)) centerElevation = centerHit.point.y;
+        if (Physics.Raycast(new Vector3(transform.position.x, transform.position.y + CameraElevationHeightCheck, transform.position.z), Vector3.down, out cameraHit, Mathf.Infinity, ElevationMask)) cameraElevation = cameraHit.point.y;
 
         if(centerElevation >= cameraElevation) Center.transform.position = Vector3.SmoothDamp(Center.transform.position, new Vector3(Center.transform.position.x, centerElevation, Center.transform.position.z), ref ElevationVelocity, CameraElevationSmoothness);
         else Center.transform.position = Vector3.SmoothDamp(Center.transform.position, new Vector3(Center.transform.position.x, cameraElevation, Center.transform.position.z), ref ElevationVelocity, CameraElevationSmoothness);

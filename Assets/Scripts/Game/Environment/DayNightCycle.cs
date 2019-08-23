@@ -6,30 +6,33 @@ using UnityEngine.Rendering.PostProcessing;
 //Day and night cycle system that controls all the environmental lighting within the game
 public class DayNightCycle : MonoBehaviour
 {
+    [Header("General Settings")]
     public Light Sun;
     public bool Paused = false;
     [Range(0.0f, 1.0f)]
     public float CurrentTime = 0;
     public float CycleDuration = 20;
-    public float MaxSunIntensity = 2.5f;
-    public float MinAmbientIntensity = 1.2f;
-    public float MaxAmbientIntensity = 3.45f;
-    public float AuraDayAmbientStrength = 0.5f;
-    public float AuraNightAmbientStrength = 0.27f;
-    public float AuraDayAmbientDensity = 0.12f;
-    public float AuraNightAmbientDensity = 0.3f;
     public AnimationCurve CycleCurve = AnimationCurve.Linear(0, 0, 1, 1);
-    public Color AuraDayAmbientColor = Color.white;
-    public Color AuraNightAmbientColor = Color.black;
+    [Header("Sun Settings")]
+    //public float DaySunIntensity = 2.5f;
+    //public float NightSunIntensity = 0.5f;
+    public AnimationCurve SunIntensity = AnimationCurve.Linear(0, 0, 1, 1);
+    //public Color DaySunColor;
+    //public Color NightSunColor;
+    public Gradient SunColor;
+    [Header("Ambient Settings")]
+    //public float DayAmbientIntensity = 1f;
+    //public float NightAmbientIntensity = 0.69f;
+    public AnimationCurve AmbientIntensity = AnimationCurve.Linear(0, 0, 1, 1);
+    [Header("Skybox Settings")]
+    public Material DaySkybox;
+    public Material NightSkybox;
+    [Header("Fog Settings")]
+    //public Color DayFogColor;
+    //public Color NightFogColor;
+    public Gradient FogColor;
 
     private float CycleTimer = 0;
-
-    private AuraAPI.Aura VolumetricLight;
-
-    void Start()
-    {
-        VolumetricLight = GetComponent<AuraAPI.Aura>();
-    }
 
     void LateUpdate()
     {
@@ -41,11 +44,24 @@ public class DayNightCycle : MonoBehaviour
         }
 
         float currentTimeValue = CycleCurve.Evaluate(CurrentTime);
-        Sun.transform.eulerAngles = Vector3.Lerp(new Vector3(Sun.transform.eulerAngles.x, 31.1f, Sun.transform.eulerAngles.z), new Vector3(Sun.transform.eulerAngles.x, 31.1f + (360 * 2), Sun.transform.eulerAngles.z), CurrentTime);
-        Sun.intensity = currentTimeValue * MaxSunIntensity;
-        VolumetricLight.frustum.settings.color = Color.Lerp(AuraNightAmbientColor, AuraDayAmbientColor, currentTimeValue);
-        VolumetricLight.frustum.settings.density = Mathf.Lerp(AuraNightAmbientDensity, AuraDayAmbientDensity, currentTimeValue);
-        VolumetricLight.frustum.settings.colorStrength = Mathf.Lerp(AuraNightAmbientStrength, AuraDayAmbientStrength, currentTimeValue);
-        RenderSettings.ambientIntensity = Mathf.Lerp(MinAmbientIntensity, MaxAmbientIntensity, currentTimeValue);
+        Sun.transform.eulerAngles = Vector3.Lerp(new Vector3(Sun.transform.eulerAngles.x, -63.0f, Sun.transform.eulerAngles.z), new Vector3(Sun.transform.eulerAngles.x, -63.0f + (360 * 2), Sun.transform.eulerAngles.z), CurrentTime);
+        //Sun.intensity = Mathf.Lerp(NightSunIntensity, DaySunIntensity, currentTimeValue);
+        //Sun.color = Color.Lerp(NightSunColor, DaySunColor, currentTimeValue);
+        //RenderSettings.ambientIntensity = Mathf.Lerp(NightAmbientIntensity, DayAmbientIntensity, currentTimeValue);
+        //Material blendedSkybox = new Material(RenderSettings.skybox);
+        //blendedSkybox.Lerp(NightSkybox, DaySkybox, currentTimeValue);
+        //RenderSettings.skybox = blendedSkybox;
+        //RenderSettings.fogColor = Color.Lerp(NightFogColor, DayFogColor, currentTimeValue);
+
+        Sun.intensity = SunIntensity.Evaluate(CurrentTime);
+        Sun.color = SunColor.Evaluate(CurrentTime);
+        RenderSettings.ambientIntensity = AmbientIntensity.Evaluate(CurrentTime);
+
+        //Material blendedSkybox = new Material(RenderSettings.skybox);
+        //blendedSkybox.Lerp(NightSkybox, DaySkybox, currentTimeValue);
+        //RenderSettings.skybox = blendedSkybox;
+
+        RenderSettings.fogColor = FogColor.Evaluate(CurrentTime);
+
     }
 }

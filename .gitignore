@@ -28,3 +28,4 @@ Unity.Postprocessing.Editor.Tests.csproj
 Unity.Postprocessing.Runtime.csproj
 Unity.Postprocessing.Runtime.Tests.csproj
 UpgradeLog.htm
+.vs

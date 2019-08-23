@@ -1,9 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Networking;
-using UnityEngine.Events;
-using UnityEngine.UI;
 using UnityEngine.AI;
 
 #if UNITY_EDITOR
@@ -86,4 +83,19 @@ public static class GameTools
         return NavMesh.GetAreaFromName(areas[AreaIndex]);
     }
 #endif
+
+    //Math
+    public static Vector3 GetNearestPointOnLine(Vector3 linePoint, Vector3 lineDirection, Vector3 samplePoint)
+    {
+        Vector3 lPToSPDirection = samplePoint - linePoint;
+        float dot = Vector3.Dot(lPToSPDirection, lineDirection);
+        return linePoint + lineDirection * dot;
+    }
+
+    public static Vector2 GetNearestPointOnLine(Vector2 linePoint, Vector2 lineDirection, Vector2 samplePoint)
+    {
+        Vector2 lPToSPDirection = samplePoint - linePoint;
+        float dot = Vector2.Dot(lPToSPDirection, lineDirection);
+        return linePoint + lineDirection * dot;
+    }
 }
