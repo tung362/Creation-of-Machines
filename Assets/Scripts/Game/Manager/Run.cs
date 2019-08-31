@@ -22,6 +22,9 @@ public class Run : MonoBehaviour
 
     //Races
 
+    //Voronoi data
+    private List<Vector2> RegionSiteCoords;
+
 
     void OnEnable()
     {

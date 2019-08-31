@@ -90,17 +90,17 @@ public class HouseBuilder : MonoBehaviour
             //Blueprint placement
             Vector3Int snappedPoint = Vector3Int.zero;
             Vector3Int BlueprintSnappedPoint = Vector3Int.zero;
+            Vector2 selectionBoxDimension = new Vector2(SnapOffset, 0.1f);
             if (GridOrigin)
             {
                 if (selectionHit.transform.tag == "Ground")
                 {
-                    SelectionBox.BoxDimension = new Vector2(SnapOffset, 0.1f);
                     snappedPoint = Vector3Int.FloorToInt((GridOrigin.transform.InverseTransformPoint(selectionHit.point) + new Vector3(SnapOffset * 0.5f, SnapOffset * 0.5f, SnapOffset * 0.5f)) / SnapOffset);
                     BlueprintSnappedPoint = snappedPoint;
                 }
                 if (selectionHit.transform.tag == "Tile")
                 {
-                    SelectionBox.BoxDimension = new Vector2(SnapOffset, SnapOffset);
+                    selectionBoxDimension = new Vector2(SnapOffset, SnapOffset);
                     snappedPoint = Vector3Int.FloorToInt(((GridOrigin.transform.InverseTransformPoint(selectionHit.transform.position) + new Vector3(SnapOffset * 0.5f, SnapOffset * 0.5f, SnapOffset * 0.5f)) / SnapOffset) + selectionHit.transform.InverseTransformDirection(selectionHit.normal));
                     BlueprintSnappedPoint = Vector3Int.FloorToInt((GridOrigin.transform.InverseTransformPoint(selectionHit.transform.position) + new Vector3(SnapOffset * 0.5f, SnapOffset * 0.5f, SnapOffset * 0.5f)) / SnapOffset);
                 }
@@ -110,10 +110,12 @@ public class HouseBuilder : MonoBehaviour
             }
             else
             {
-                SelectionBox.BoxDimension = new Vector2(SnapOffset, 0.1f);
                 SelectionBox.transform.position = selectionHit.point;
                 SelectionBox.transform.eulerAngles = new Vector3(0, Camera.main.transform.eulerAngles.y, 0);
             }
+
+            //Selectionbox dimension change
+            if (SelectionBox.BoxDimension != selectionBoxDimension) SelectionBox.BoxDimension = selectionBoxDimension;
 
             //Selectionbox mouse over
             RaycastHit selectionBoxHit;
@@ -173,11 +175,14 @@ public class HouseBuilder : MonoBehaviour
             //Creates a new grid tile if it doesn't exist already and spawns a new grid tile into the game
             if (!GridTiles.ContainsKey(tileCoord))
             {
-                GridTile gridTile = new GridTile();
                 GameObject outerTile = Instantiate(GridTilePrefab, Vector3.zero, Quaternion.identity, GridOrigin.transform);
                 outerTile.transform.localPosition = new Vector3((tileCoord.x * 0.5f) * SnapOffset, (tileCoord.y * 0.5f) * SnapOffset, (tileCoord.z * 0.5f) * SnapOffset);
                 outerTile.transform.localRotation = Quaternion.identity;
-                gridTile.Tile = outerTile;
+
+                GridTile gridTile = new GridTile
+                {
+                    Tile = outerTile
+                };
 
                 GridTiles.Add(tileCoord, gridTile);
             }

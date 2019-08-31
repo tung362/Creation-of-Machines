@@ -175,11 +175,14 @@ public class TerrainBuilder : MonoBehaviour
             //Creates a new grid tile if it doesn't exist already and spawns a new grid tile into the game
             if (!GridTiles.ContainsKey(tileCoord))
             {
-                GridTile gridTile = new GridTile();
                 GameObject outerTile = Instantiate(GridTilePrefab, Vector3.zero, Quaternion.identity, GridOrigin.transform);
                 outerTile.transform.localPosition = new Vector3((tileCoord.x * 0.5f) * SnapOffset, (tileCoord.y * 0.5f) * SnapOffset, (tileCoord.z * 0.5f) * SnapOffset);
                 outerTile.transform.localRotation = Quaternion.identity;
-                gridTile.Tile = outerTile;
+
+                GridTile gridTile = new GridTile
+                {
+                    Tile = outerTile
+                };
 
                 GridTiles.Add(tileCoord, gridTile);
             }
