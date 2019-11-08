@@ -1,0 +1,68 @@
+﻿#pragma kernel GenerateChunk
+#include "/Includes/Math.compute"
+#include "/Includes/MarchingCube.compute"
+
+struct TriangleGPU
+{
+    float3 vertexA;
+    float3 vertexB;
+    float3 vertexC;
+};
+
+/*Output*/
+AppendStructuredBuffer<TriangleGPU> Triangles;
+
+/*Shared data*/
+RWStructuredBuffer<float4> NoisePoints;
+float CubesPerAxis;
+
+[numthreads(8, 8, 8)]
+void GenerateChunk(uint3 id : SV_DispatchThreadID)
+{
+    //Prevents out of bounds
+    if (id.x >= CubesPerAxis - 1 || id.y >= CubesPerAxis - 1 || id.z >= CubesPerAxis - 1) return;
+
+    //Grab cube noise data for current cube
+    float4 cornerNodes[8] =
+    {
+        //Bottom
+        NoisePoints[IndexByCoord(id.x, id.y, id.z)],
+        NoisePoints[IndexByCoord(id.x + 1, id.y, id.z)],
+        NoisePoints[IndexByCoord(id.x + 1, id.y, id.z + 1)],
+        NoisePoints[IndexByCoord(id.x, id.y, id.z + 1)],
+        //Top
+        NoisePoints[IndexByCoord(id.x, id.y + 1, id.z)],
+        NoisePoints[IndexByCoord(id.x + 1, id.y + 1, id.z)],
+        NoisePoints[IndexByCoord(id.x + 1, id.y + 1, id.z + 1)],
+        NoisePoints[IndexByCoord(id.x, id.y + 1, id.z + 1)]
+    };
+
+    //Find unique index for cube combination
+    int triTableIndex = 0;
+    if (cornerNodes[0].w < 0.5f) triTableIndex |= 1;
+    if (cornerNodes[1].w < 0.5f) triTableIndex |= 2;
+    if (cornerNodes[2].w < 0.5f) triTableIndex |= 4;
+    if (cornerNodes[3].w < 0.5f) triTableIndex |= 8;
+    if (cornerNodes[4].w < 0.5f) triTableIndex |= 16;
+    if (cornerNodes[5].w < 0.5f) triTableIndex |= 32;
+    if (cornerNodes[6].w < 0.5f) triTableIndex |= 64;
+    if (cornerNodes[7].w < 0.5f) triTableIndex |= 128;
+
+    for (int i = 0; TriTable[triTableIndex][i] != -1; i += 3)
+    {
+        int vertex1NodeA = VerticeNodeToCornerNodeIndex[TriTable[triTableIndex][i]][0];
+        int vertex1NodeB = VerticeNodeToCornerNodeIndex[TriTable[triTableIndex][i]][1];
+
+        int vertex2NodeA = VerticeNodeToCornerNodeIndex[TriTable[triTableIndex][i + 1]][0];
+        int vertex2NodeB = VerticeNodeToCornerNodeIndex[TriTable[triTableIndex][i + 1]][1];
+
+        int vertex3NodeA = VerticeNodeToCornerNodeIndex[TriTable[triTableIndex][i + 2]][0];
+        int vertex3NodeB = VerticeNodeToCornerNodeIndex[TriTable[triTableIndex][i + 2]][1];
+
+        TriangleGPU tri;
+        tri.vertexA = (cornerNodes[vertex1NodeA].xyz + cornerNodes[vertex1NodeB].xyz) * 0.5f;
+        tri.vertexB = (cornerNodes[vertex2NodeA].xyz + cornerNodes[vertex2NodeB].xyz) * 0.5f;
+        tri.vertexC = (cornerNodes[vertex3NodeA].xyz + cornerNodes[vertex3NodeB].xyz) * 0.5f;
+        Triangles.Append(tri);
+    }
+}

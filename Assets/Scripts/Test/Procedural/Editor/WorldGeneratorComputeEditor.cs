@@ -2,15 +2,31 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
+using csDelaunay;
+using COM;
 
-namespace COM
+namespace COM.Test
 {
-    [CustomEditor(typeof(WorldGenerator))]
-    public class WorldGeneratorEditor : Editor
+    [CustomEditor(typeof(WorldGeneratorComputeOld))]
+    public class WorldGeneratorComputeEditor : Editor
     {
-        //targeted script data
-        private WorldGenerator TargetedScript;
+        //Exposed properties
+        public SerializedProperty MapSeed;
+        public SerializedProperty MapSize;
+        public SerializedProperty MapChunkSize;
+        public SerializedProperty MapScale;
+        public SerializedProperty MapOctaves;
+        public SerializedProperty MapPersistance;
+        public SerializedProperty MapLacunarity;
+        public SerializedProperty MapOffset;
+        public SerializedProperty MapMaskType;
+        public SerializedProperty MapMaskRadius;
+        public SerializedProperty MapLayers;
+        public SerializedProperty MapLayersLayerThreshold;
+        public SerializedProperty MapLayersMaxLayerHeight;
 
+        //targeted script data
+        private WorldGeneratorComputeOld TargetedScript;
         //Texture data
         private Texture2D PreviewNormGrayscaleTexture;
         private Texture2D PreviewVoronoiGrayscaleTexture;
@@ -22,11 +38,10 @@ namespace COM
         private Texture2D PreviewSubRegionMatchTexture;
         private Texture2D PreviewSubCombinedLayerTexture;
         private Texture2D PreviewCompleteTexture;
-
         //Voronoi data
         private List<MapRegion> MapRegions = new List<MapRegion>();
         private MapRegionGPU[] MapRegionGPUs;
-
+        private KDTree VoronoiKDTree;
         //Chunk generation data
         private int CurrentChunkX = 0;
         private int CurrentChunkY = 0;
@@ -36,14 +51,28 @@ namespace COM
 
         void OnEnable()
         {
-            TargetedScript = (WorldGenerator)target;
+            TargetedScript = (WorldGeneratorComputeOld)target;
+            MapSeed = serializedObject.FindProperty("MapSeed");
+            MapSize = serializedObject.FindProperty("MapSize");
+            MapChunkSize = serializedObject.FindProperty("MapChunkSize");
+            MapScale = serializedObject.FindProperty("MapScale");
+            MapOctaves = serializedObject.FindProperty("MapOctaves");
+            MapPersistance = serializedObject.FindProperty("MapPersistance");
+            MapLacunarity = serializedObject.FindProperty("MapLacunarity");
+            MapOffset = serializedObject.FindProperty("MapOffset");
+            MapMaskType = serializedObject.FindProperty("MapMaskType");
+            MapMaskRadius = serializedObject.FindProperty("MapMaskRadius");
+            MapLayers = serializedObject.FindProperty("MapLayers");
+            MapLayersLayerThreshold = MapLayers.FindPropertyRelative("_LayerThreshold");
+            MapLayersMaxLayerHeight = MapLayers.FindPropertyRelative("MaxLayerHeight");
             GeneratePreviewMap();
         }
 
         public override void OnInspectorGUI()
         {
-            EditorGUILayout.LabelField("Map Size: " + TargetedScript.MapSize.x + "x" + TargetedScript.MapSize.y);
-            EditorGUILayout.LabelField("Number of Chunks: " + Mathf.CeilToInt((TargetedScript.MapSize.x / TargetedScript.ChunkSize) * (TargetedScript.MapSize.y / TargetedScript.ChunkSize)));
+            EditorGUILayout.LabelField("Chunk Size: " + MapChunkSize.intValue + "x" + MapChunkSize.intValue);
+            EditorGUILayout.LabelField("Total Map Dimension: " + MapSize.vector2IntValue.x * MapChunkSize.intValue + "x" + MapSize.vector2IntValue.y * MapChunkSize.intValue);
+            EditorGUILayout.LabelField("Number of Chunks: " + MapSize.vector2IntValue.x * MapSize.vector2IntValue.y);
             EditorGUI.BeginChangeCheck();
             DrawDefaultInspector();
             if (EditorGUI.EndChangeCheck())
@@ -67,11 +96,11 @@ namespace COM
             }
 
             //Creates 1 chunk every frame to reduce lag
-            if (CurrentChunkX < Mathf.CeilToInt(TargetedScript.MapSize.x / 8.0f))
+            if (CurrentChunkX < MapSize.vector2IntValue.x)
             {
                 GeneratePreviewMapChunk(CurrentChunkX, CurrentChunkY);
                 CurrentChunkY++;
-                if (CurrentChunkY >= Mathf.CeilToInt(TargetedScript.MapSize.y / 8.0f))
+                if (CurrentChunkY >= MapSize.vector2IntValue.y)
                 {
                     CurrentChunkY = 0;
                     CurrentChunkX++;
@@ -87,6 +116,7 @@ namespace COM
 
             //Voronoi map
             TargetedScript.GenerateVoronoiGraph(MapRegions);
+            VoronoiKDTree = TargetedScript.CreateKDTree(MapRegions);
 
             //Normal map
             MapOctaveOffsets = TargetedScript.GenerateMapOctaveOffsets(false);
@@ -100,19 +130,19 @@ namespace COM
             MapRegionGPUs = TargetedScript.CreateMapRegionGPUs(MapRegions);
 
             //Create texture
-            PreviewNormGrayscaleTexture = new Texture2D(TargetedScript.MapSize.x, TargetedScript.MapSize.y);
-            PreviewVoronoiGrayscaleTexture = new Texture2D(TargetedScript.MapSize.x, TargetedScript.MapSize.y);
-            PreviewBaseLayerTexture = new Texture2D(TargetedScript.MapSize.x, TargetedScript.MapSize.y);
-            PreviewRegionMatchTexture = new Texture2D(TargetedScript.MapSize.x, TargetedScript.MapSize.y);
-            PreviewCombinedLayerTexture = new Texture2D(TargetedScript.MapSize.x, TargetedScript.MapSize.y);
-            PreviewSubGrayscaleTexture = new Texture2D(TargetedScript.MapSize.x, TargetedScript.MapSize.y);
-            PreviewSubBaseLayerTexture = new Texture2D(TargetedScript.MapSize.x, TargetedScript.MapSize.y);
-            PreviewSubRegionMatchTexture = new Texture2D(TargetedScript.MapSize.x, TargetedScript.MapSize.y);
-            PreviewSubCombinedLayerTexture = new Texture2D(TargetedScript.MapSize.x, TargetedScript.MapSize.y);
-            PreviewCompleteTexture = new Texture2D(TargetedScript.MapSize.x, TargetedScript.MapSize.y);
+            PreviewNormGrayscaleTexture = new Texture2D(MapSize.vector2IntValue.x * MapChunkSize.intValue, MapSize.vector2IntValue.y * MapChunkSize.intValue);
+            PreviewVoronoiGrayscaleTexture = new Texture2D(MapSize.vector2IntValue.x * MapChunkSize.intValue, MapSize.vector2IntValue.y * MapChunkSize.intValue);
+            PreviewBaseLayerTexture = new Texture2D(MapSize.vector2IntValue.x * MapChunkSize.intValue, MapSize.vector2IntValue.y * MapChunkSize.intValue);
+            PreviewRegionMatchTexture = new Texture2D(MapSize.vector2IntValue.x * MapChunkSize.intValue, MapSize.vector2IntValue.y * MapChunkSize.intValue);
+            PreviewCombinedLayerTexture = new Texture2D(MapSize.vector2IntValue.x * MapChunkSize.intValue, MapSize.vector2IntValue.y * MapChunkSize.intValue);
+            PreviewSubGrayscaleTexture = new Texture2D(MapSize.vector2IntValue.x * MapChunkSize.intValue, MapSize.vector2IntValue.y * MapChunkSize.intValue);
+            PreviewSubBaseLayerTexture = new Texture2D(MapSize.vector2IntValue.x * MapChunkSize.intValue, MapSize.vector2IntValue.y * MapChunkSize.intValue);
+            PreviewSubRegionMatchTexture = new Texture2D(MapSize.vector2IntValue.x * MapChunkSize.intValue, MapSize.vector2IntValue.y * MapChunkSize.intValue);
+            PreviewSubCombinedLayerTexture = new Texture2D(MapSize.vector2IntValue.x * MapChunkSize.intValue, MapSize.vector2IntValue.y * MapChunkSize.intValue);
+            PreviewCompleteTexture = new Texture2D(MapSize.vector2IntValue.x * MapChunkSize.intValue, MapSize.vector2IntValue.y * MapChunkSize.intValue);
 
             //Map center
-            Center = new Vector2((float)TargetedScript.MapSize.x / 2, (float)TargetedScript.MapSize.y / 2);
+            Center = new Vector2((float)MapSize.vector2IntValue.x / 2, (float)MapSize.vector2IntValue.y / 2);
 
             PreviewNormGrayscaleTexture.wrapMode = TextureWrapMode.Clamp;
             PreviewNormGrayscaleTexture.filterMode = FilterMode.Point;
@@ -163,17 +193,6 @@ namespace COM
             //}
         }
 
-        void DrawPreviewPicture(string lableName, Texture2D objectReferenceValue, float spacing)
-        {
-            if (objectReferenceValue)
-            {
-                EditorGUILayout.LabelField(lableName, EditorStyles.boldLabel);
-                EditorGUI.DrawPreviewTexture(new Rect(EditorGUILayout.GetControlRect().x, EditorGUILayout.GetControlRect().y - 20, EditorGUILayout.GetControlRect().width, EditorGUILayout.GetControlRect().width), objectReferenceValue);
-                GUILayout.Space(EditorGUIUtility.currentViewWidth - 100);
-                GUILayout.Space(spacing);
-            }
-        }
-
         void GeneratePreviewMapChunk(int ChunkCoordX, int ChunkCoordY)
         {
             WGEditorOutputGPU[] normHeights = GenerateNoise(ChunkCoordX, ChunkCoordY, MapOctaveOffsets, SubMapOctaveOffsets, MapRegionGPUs);
@@ -193,16 +212,16 @@ namespace COM
 
                 PreviewNormGrayscaleTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.black, Color.white, normHeights[i].normHeight));
                 PreviewVoronoiGrayscaleTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.black, Color.white, normHeights[i].voronoiHeight));
-                PreviewBaseLayerTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.blue, Color.red, TargetedScript.MapLayers._LayerThreshold.Evaluate(normHeights[i].normHeight) / TargetedScript.MapLayers.MaxLayerHeight));
+                PreviewBaseLayerTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.blue, Color.red, MapLayersLayerThreshold.animationCurveValue.Evaluate(normHeights[i].normHeight) / MapLayersMaxLayerHeight.intValue));
 
                 PreviewRegionMatchTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.black, Color.white, normHeights[i].voronoiMatchHeight));
-                PreviewCombinedLayerTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.blue, Color.red, TargetedScript.MapLayers._LayerThreshold.Evaluate(normHeights[i].combinedHeight) / TargetedScript.MapLayers.MaxLayerHeight));
+                PreviewCombinedLayerTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.blue, Color.red, MapLayersLayerThreshold.animationCurveValue.Evaluate(normHeights[i].combinedHeight) / MapLayersMaxLayerHeight.intValue));
 
                 PreviewSubGrayscaleTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.black, Color.white, normHeights[i].subHeight));
-                PreviewSubBaseLayerTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.blue, Color.red, TargetedScript.MapLayers._LayerThreshold.Evaluate(normHeights[i].subHeight) / TargetedScript.MapLayers.MaxLayerHeight));
+                PreviewSubBaseLayerTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.blue, Color.red, MapLayersLayerThreshold.animationCurveValue.Evaluate(normHeights[i].subHeight) / MapLayersMaxLayerHeight.intValue));
                 PreviewSubRegionMatchTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.black, Color.white, normHeights[i].subVoronoiMatchHeight));
-                PreviewSubCombinedLayerTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.blue, Color.red, TargetedScript.MapLayers._LayerThreshold.Evaluate(normHeights[i].subCombinedHeight) / TargetedScript.MapLayers.MaxLayerHeight));
-                PreviewCompleteTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.blue, caveColor, TargetedScript.MapLayers._LayerThreshold.Evaluate(completeHeight) / TargetedScript.MapLayers.MaxLayerHeight));
+                PreviewSubCombinedLayerTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.blue, Color.red, MapLayersLayerThreshold.animationCurveValue.Evaluate(normHeights[i].subCombinedHeight) / MapLayersMaxLayerHeight.intValue));
+                PreviewCompleteTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.blue, caveColor, MapLayersLayerThreshold.animationCurveValue.Evaluate(completeHeight) / MapLayersMaxLayerHeight.intValue));
             }
 
             PreviewNormGrayscaleTexture.Apply();
@@ -217,66 +236,64 @@ namespace COM
             PreviewCompleteTexture.Apply();
         }
 
+        void DrawPreviewPicture(string lableName, Texture2D objectReferenceValue, float spacing)
+        {
+            if (objectReferenceValue)
+            {
+                EditorGUILayout.LabelField(lableName, EditorStyles.boldLabel);
+                EditorGUI.DrawPreviewTexture(new Rect(EditorGUILayout.GetControlRect().x, EditorGUILayout.GetControlRect().y - 20, EditorGUILayout.GetControlRect().width, EditorGUILayout.GetControlRect().width), objectReferenceValue);
+                GUILayout.Space(EditorGUIUtility.currentViewWidth - 100);
+                GUILayout.Space(spacing);
+            }
+        }
+
         public WGEditorOutputGPU[] GenerateNoise(int ChunkCoordX, int ChunkCoordY, Vector2[] mapOctaveOffsets, Vector2[] mapSubOctaveOffsets, MapRegionGPU[] mapRegionGPUs)
         {
-            //Run through a chunk of 8x8x8 grid tiles
+            WGEditorOutputGPU[] outputs = new WGEditorOutputGPU[64];
             int threadNum = 8;
 
-            //Outputs a Chunk of 8x8 pixels = 64
-            WGEditorOutputGPU[] heightOutputs = new WGEditorOutputGPU[64];
-
-            //Find bytes
-            int sizeOfPixelOutputs;
+            int sizeOfOutputs;
             int sizeOfMapOctaveOffsets;
             int sizeOfMapRegionGPUs;
             unsafe
             {
-                sizeOfPixelOutputs = sizeof(WGEditorOutputGPU);
+                sizeOfOutputs = sizeof(WGEditorOutputGPU);
                 sizeOfMapOctaveOffsets = sizeof(Vector2);
                 sizeOfMapRegionGPUs = sizeof(MapRegionGPU);
             }
 
-            //Kernal
-            int kernel = TargetedScript.WGEditorShader.FindKernel("NoiseEditor");
+            int kernel = TargetedScript.WGEditorShader.FindKernel("NoiseEditorOld");
 
-            //RWStructuredBuffer sets
-            ComputeBuffer heightBuffer = new ComputeBuffer(heightOutputs.Length, sizeOfPixelOutputs);
-            heightBuffer.SetData(heightOutputs);
-            TargetedScript.WGEditorShader.SetBuffer(kernel, "Heights", heightBuffer);
+            ComputeBuffer resultBuffer = new ComputeBuffer(outputs.Length, sizeOfOutputs);
+            resultBuffer.SetData(outputs);
+            TargetedScript.WGEditorShader.SetBuffer(kernel, "Result", resultBuffer);
 
-            //Sets
             TargetedScript.WGEditorShader.SetInts("ThreadDimensions", new int[3] { threadNum, threadNum, 1 });
             TargetedScript.WGEditorShader.SetInts("ChunkCoord", new int[3] { ChunkCoordX, ChunkCoordY, 1 });
-            TargetedScript.WGEditorShader.SetFloat("MapScale", TargetedScript.MapScale);
-            TargetedScript.WGEditorShader.SetFloat("MapPersistance", TargetedScript.MapPersistance);
-            TargetedScript.WGEditorShader.SetFloat("MapLacunarity", TargetedScript.MapLacunarity);
-            TargetedScript.WGEditorShader.SetInt("Octaves", TargetedScript.MapOctaves);
+            TargetedScript.WGEditorShader.SetFloat("MapScale", MapScale.floatValue);
+            TargetedScript.WGEditorShader.SetFloat("MapPersistance", MapPersistance.floatValue);
+            TargetedScript.WGEditorShader.SetFloat("MapLacunarity", MapLacunarity.floatValue);
+            TargetedScript.WGEditorShader.SetInt("Octaves", MapOctaves.intValue);
             TargetedScript.WGEditorShader.SetInt("Sites", mapRegionGPUs.Length);
-
-            //StructuredBuffer sets
             ComputeBuffer mapOctaveOffsetsBuffer = new ComputeBuffer(mapOctaveOffsets.Length, sizeOfMapOctaveOffsets);
-            ComputeBuffer mapSubOctaveOffsetsBuffer = new ComputeBuffer(mapSubOctaveOffsets.Length, sizeOfMapOctaveOffsets);
-            ComputeBuffer mapRegionGPUsBuffer = new ComputeBuffer(mapRegionGPUs.Length, sizeOfMapRegionGPUs);
             mapOctaveOffsetsBuffer.SetData(mapOctaveOffsets);
-            mapSubOctaveOffsetsBuffer.SetData(mapSubOctaveOffsets);
-            mapRegionGPUsBuffer.SetData(mapRegionGPUs);
             TargetedScript.WGEditorShader.SetBuffer(kernel, "MapOctaveOffsets", mapOctaveOffsetsBuffer);
+            ComputeBuffer mapSubOctaveOffsetsBuffer = new ComputeBuffer(mapSubOctaveOffsets.Length, sizeOfMapOctaveOffsets);
+            mapSubOctaveOffsetsBuffer.SetData(mapSubOctaveOffsets);
             TargetedScript.WGEditorShader.SetBuffer(kernel, "SubMapOctaveOffsets", mapSubOctaveOffsetsBuffer);
+            ComputeBuffer mapRegionGPUsBuffer = new ComputeBuffer(mapRegionGPUs.Length, sizeOfMapRegionGPUs);
+            mapRegionGPUsBuffer.SetData(mapRegionGPUs);
             TargetedScript.WGEditorShader.SetBuffer(kernel, "MapRegions", mapRegionGPUsBuffer);
 
-            //Run kernal
             TargetedScript.WGEditorShader.Dispatch(kernel, threadNum, threadNum, 1);
 
-            //Grab outputs
-            heightBuffer.GetData(heightOutputs);
+            resultBuffer.GetData(outputs);
 
-            //Get rid of buffer data
-            heightBuffer.Dispose();
+            resultBuffer.Dispose();
             mapOctaveOffsetsBuffer.Dispose();
-            mapSubOctaveOffsetsBuffer.Dispose();
             mapRegionGPUsBuffer.Dispose();
 
-            return heightOutputs;
+            return outputs;
         }
     }
 }

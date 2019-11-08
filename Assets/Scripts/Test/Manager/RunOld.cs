@@ -2,12 +2,14 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace COM
+namespace COM.Test
 {
-    public class Run : MonoBehaviour
+    //Game manager, keeps track of all registries
+    public class RunOld : MonoBehaviour
     {
-        public static Run instance { get; private set; }
+        public static RunOld instance { get; private set; }
 
+        public OuterTileDictionary OuterTiles;
         //HouseDecorations (tables, lights, chests, etc)
         //Terrain tiles
         //Terrain objects (rocks and plants)
@@ -21,6 +23,10 @@ namespace COM
         //Miscellaneous
 
         //Races
+
+        //Voronoi data
+        private List<Vector2> RegionSiteCoords;
+
 
         void OnEnable()
         {

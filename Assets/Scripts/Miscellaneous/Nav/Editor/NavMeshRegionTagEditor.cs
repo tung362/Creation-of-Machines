@@ -4,26 +4,29 @@ using UnityEngine;
 using UnityEditor;
 using UnityEngine.AI;
 
-[CanEditMultipleObjects]
-[CustomEditor(typeof(NavMeshRegionTag))]
-public class NavMeshRegionTagEditor : Editor
+namespace COM
 {
-    SerializedProperty BuildType;
-    SerializedProperty AreaID;
-
-    void OnEnable()
+    [CanEditMultipleObjects]
+    [CustomEditor(typeof(NavMeshRegionTag))]
+    public class NavMeshRegionTagEditor : Editor
     {
-        BuildType = serializedObject.FindProperty("BuildType");
-        AreaID = serializedObject.FindProperty("AreaID");
-    }
+        SerializedProperty BuildType;
+        SerializedProperty AreaID;
 
-    public override void OnInspectorGUI()
-    {
-        serializedObject.Update();
+        void OnEnable()
+        {
+            BuildType = serializedObject.FindProperty("BuildType");
+            AreaID = serializedObject.FindProperty("AreaID");
+        }
 
-        EditorGUILayout.PropertyField(BuildType);
-        UnityEditor.AI.NavMeshComponentsGUIUtility.AreaPopup("Area Type", AreaID);
+        public override void OnInspectorGUI()
+        {
+            serializedObject.Update();
 
-        serializedObject.ApplyModifiedProperties();
+            EditorGUILayout.PropertyField(BuildType);
+            UnityEditor.AI.NavMeshComponentsGUIUtility.AreaPopup("Area Type", AreaID);
+
+            serializedObject.ApplyModifiedProperties();
+        }
     }
 }

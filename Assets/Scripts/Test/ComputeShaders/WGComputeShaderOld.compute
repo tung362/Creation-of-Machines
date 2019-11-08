@@ -1,0 +1,139 @@
+﻿#pragma kernel NoiseOld
+#include "/Includes/MathOld.compute"
+#include "/Includes/NoiseOld.compute"
+
+struct TileDataGPU
+{
+    int d0, d1, d2, d3, d4, d5, d6, d7;
+
+    void Set(int index, int value)
+    {
+        switch (index)
+        {
+            case 0: d0 = value; break;
+            case 1: d1 = value; break;
+            case 2: d2 = value; break;
+            case 3: d3 = value; break;
+            case 4: d4 = value; break;
+            case 5: d5 = value; break;
+            case 6: d6 = value; break;
+            case 7: d7 = value; break;
+        }
+    }
+
+    int Get(int index)
+    {
+        switch (index)
+        {
+            case 0: return d0;
+            case 1: return d1;
+            case 2: return d2;
+            case 3: return d3;
+            case 4: return d4;
+            case 5: return d5;
+            case 6: return d6;
+            case 7: return d7;
+            default: return d0;
+        }
+    }
+};
+
+struct GridTileGPU
+{
+    bool IsEmpty;
+    int3 Coord;
+};
+
+struct GridSubtileGPU
+{
+    TileDataGPU TileData;
+    int3 Coord;
+};
+
+/*Output*/
+//8x8x8
+RWStructuredBuffer<GridTileGPU> GridTiles;
+//9x9x9
+RWStructuredBuffer<GridSubtileGPU> GridSubTiles;
+
+//Shared data
+int3 CenterCoord;
+int3 ChunkCoord;
+
+//Builder
+int Thresholds;
+StructuredBuffer<KeyFrameGPU> ThresholdFrames;
+
+void UpdateGridSubTile(bool add, int3 tileCoord, int affectedTileDataIndex)
+{
+    //Local space
+    int3 coord = int3((tileCoord.x + 1) * 0.5f, (tileCoord.y + 1) * 0.5f, (tileCoord.z + 1) * 0.5f);
+
+    if (coord.x >= 0 && coord.x <= 8 &&
+        coord.y >= 0 && coord.y <= 8 &&
+        coord.z >= 0 && coord.z <= 8)
+    {
+        int index = IndexByCoord(coord.x, coord.y, coord.z, int3(9, 9, 9));
+
+        int3 worldCoord = int3((ChunkCoord.x * 8) + coord.x, (ChunkCoord.y * 8) + coord.y, (ChunkCoord.z * 8) + coord.z);
+
+        GridSubTiles[index].TileData.Set(affectedTileDataIndex, add ? 1 : 0);
+        GridSubTiles[index].Coord = worldCoord;
+    }
+}
+
+[numthreads(10, 10, 10)]
+void NoiseOld(uint3 id : SV_DispatchThreadID)
+{
+	//Local space
+    int index = IndexByCoord(id.x, id.y, id.z);
+    int3 coord = CoordByIndex(index);
+    int3 offsettedCoord = int3(coord.x - 1, coord.y - 1, coord.z - 1);
+
+    //World space
+    int3 worldCoord = int3((ChunkCoord.x * 8) + offsettedCoord.x, (ChunkCoord.y * 8) + offsettedCoord.y, (ChunkCoord.z * 8) + offsettedCoord.z);
+
+    bool gridTileIsEmpty = true;
+	
+	//Voronoi map
+    int regionIndexes[3];
+    float voronoiHeight = Voronoi(worldCoord.x, worldCoord.z, regionIndexes);
+	
+	//Normal map
+    float normHeight = Perlin(worldCoord.x, worldCoord.z, MapOctaveOffsets);
+    float combinedHeight = BiomeBlend(normHeight, voronoiHeight, float2(worldCoord.x, worldCoord.z), regionIndexes, false);
+
+	//Subtractive map
+    float subHeight = Perlin(worldCoord.x, worldCoord.z, SubMapOctaveOffsets);
+    float subCombinedHeight = BiomeBlendSubtrative(subHeight, voronoiHeight, float2(worldCoord.x, worldCoord.z), regionIndexes, true);
+
+	//3D height of the combined noise
+    int layer = Evaluate(combinedHeight, ThresholdFrames, Thresholds);
+    int subLayer = Evaluate(subCombinedHeight, ThresholdFrames, Thresholds);
+
+    //If above the cave layer
+    if (worldCoord.y >= subLayer && worldCoord.y < layer)
+    {
+        //Top 2x2
+        UpdateGridSubTile(true, (offsettedCoord * 2) + int3(-1, 1, 1), 2);
+        UpdateGridSubTile(true, (offsettedCoord * 2) + int3(1, 1, 1), 3);
+        UpdateGridSubTile(true, (offsettedCoord * 2) + int3(1, 1, -1), 0);
+        UpdateGridSubTile(true, (offsettedCoord * 2) + int3(-1, 1, -1), 1);
+        //Bottom 2x2
+        UpdateGridSubTile(true, (offsettedCoord * 2) + int3(-1, -1, 1), 6);
+        UpdateGridSubTile(true, (offsettedCoord * 2) + int3(1, -1, 1), 7);
+        UpdateGridSubTile(true, (offsettedCoord * 2) + int3(1, -1, -1), 4);
+        UpdateGridSubTile(true, (offsettedCoord * 2) + int3(-1, -1, -1), 5);
+        gridTileIsEmpty = false;
+    }
+	
+    //Inner 8x8x8
+    if (offsettedCoord.x >= 0 && offsettedCoord.x <= 7 &&
+        offsettedCoord.y >= 0 && offsettedCoord.y <= 7 &&
+        offsettedCoord.z >= 0 && offsettedCoord.z <= 7)
+    {
+        index = IndexByCoord(offsettedCoord.x, offsettedCoord.y, offsettedCoord.z, int3(8, 8, 8));
+        GridTiles[index].IsEmpty = gridTileIsEmpty;
+        GridTiles[index].Coord = worldCoord;
+    }
+}

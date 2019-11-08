@@ -4,34 +4,37 @@ using UnityEngine;
 using UnityEditor;
 using UnityEngine.AI;
 
-[CanEditMultipleObjects]
-[CustomEditor(typeof(NavMeshRegion))]
-public class NavMeshRegionEditor : Editor
+namespace COM
 {
-    SerializedProperty TrackedObject;
-    SerializedProperty BuildSize;
-    SerializedProperty AgentID;
-    SerializedProperty MinRegionArea;
-    SerializedProperty ManualUpdate;
-
-    void OnEnable()
+    [CanEditMultipleObjects]
+    [CustomEditor(typeof(NavMeshRegion))]
+    public class NavMeshRegionEditor : Editor
     {
-        TrackedObject = serializedObject.FindProperty("TrackedObject");
-        BuildSize = serializedObject.FindProperty("BuildSize");
-        AgentID = serializedObject.FindProperty("AgentID");
-        MinRegionArea = serializedObject.FindProperty("MinRegionArea");
-        ManualUpdate = serializedObject.FindProperty("ManualUpdate");
-    }
+        SerializedProperty TrackedObject;
+        SerializedProperty BuildSize;
+        SerializedProperty AgentID;
+        SerializedProperty MinRegionArea;
+        SerializedProperty ManualUpdate;
 
-    public override void OnInspectorGUI()
-    {
-        serializedObject.Update();
-        EditorGUILayout.PropertyField(TrackedObject);
-        EditorGUILayout.PropertyField(BuildSize);
-        UnityEditor.AI.NavMeshComponentsGUIUtility.AgentTypePopup("Agent Type", AgentID);
-        EditorGUILayout.PropertyField(MinRegionArea);
-        EditorGUILayout.PropertyField(ManualUpdate);
+        void OnEnable()
+        {
+            TrackedObject = serializedObject.FindProperty("TrackedObject");
+            BuildSize = serializedObject.FindProperty("BuildSize");
+            AgentID = serializedObject.FindProperty("AgentID");
+            MinRegionArea = serializedObject.FindProperty("MinRegionArea");
+            ManualUpdate = serializedObject.FindProperty("ManualUpdate");
+        }
 
-        serializedObject.ApplyModifiedProperties();
+        public override void OnInspectorGUI()
+        {
+            serializedObject.Update();
+            EditorGUILayout.PropertyField(TrackedObject);
+            EditorGUILayout.PropertyField(BuildSize);
+            UnityEditor.AI.NavMeshComponentsGUIUtility.AgentTypePopup("Agent Type", AgentID);
+            EditorGUILayout.PropertyField(MinRegionArea);
+            EditorGUILayout.PropertyField(ManualUpdate);
+
+            serializedObject.ApplyModifiedProperties();
+        }
     }
 }

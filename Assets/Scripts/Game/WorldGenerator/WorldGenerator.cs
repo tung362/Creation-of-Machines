@@ -3,214 +3,406 @@ using System.Collections.Generic;
 using UnityEngine;
 using csDelaunay;
 
-//[ExecuteInEditMode]
-public class WorldGenerator : MonoBehaviour
+namespace COM
 {
-    [Header("Generator Settings")]
-    //Stores all unique patterns
-    public List<GridPattern> GridPatternTemplates = new List<GridPattern>();
-    public string MapSeed = "Seed";
-    public Vector2Int MapSize = new Vector2Int(100, 100);
-    public float MapScale = 20;
-    public int MapOctaves = 4;
-    public float MapPersistance = 0.5f;
-    public float MapLacunarity = 1.87f;
-    public Vector2 MapOffset = Vector2.zero;
-    public MapGradientMaskType MapMaskType = MapGradientMaskType.None;
-    [Range(-2.0f, 2.0f)]
-    public float MapMaskRadius = 0.75f;
-    public GenerationThreshold MapLayers;
-
-    [Header("Voronoi Settings")]
-    public int VoronoiSiteCount = 100;
-    public int VoronoiRelaxationCount = 5;
-    public VoronoiGradientMaskType VoronoiMaskType = VoronoiGradientMaskType.None;
-    [Range(0.01f, 1)]
-    public float VoronoiMaskRadius = 1.0f;
-    public VoronoiBiomeMaskType VoronoiBiomeMaskType = VoronoiBiomeMaskType.None;
-
-    void Start()
+    public class WorldGenerator : MonoBehaviour
     {
-    }
+        public static WorldGenerator instance { get; private set; }
 
-    void Update()
-    {
-    }
+        [Header("Editor Settings")]
+        public ComputeShader WGEditorShader;
 
-    #region Normal Map
-    public float GenerateMapCoordData(Vector2 tileCoord, Vector2[] mapOctavesOffsets)
-    {
-        //Height value
-        float total = 0;
-        float frequency = 1;
-        float amplitude = 1;
-        float totalAmplitude = 0;
+        [Header("Generator Settings")]
+        public ComputeShader WGShader;
+        public ComputeShader WGNoiseShader;
+        public string MapSeed = "Seed";
+        public Vector2Int MapSize = new Vector2Int(150, 150);
+        public float IsoLevel = 8;
+        public int CubesPerAxis = 30;
+        public float ChunkSize = 10;
+        public GameObject TestSpawn;
+        public Material TestMat;
 
-        for (int i = 0; i < mapOctavesOffsets.Length; i++)
+
+        [Header("Base Settings")]
+        public float MapScale = 20;
+        public int MapOctaves = 4;
+        public float MapPersistance = 0.5f;
+        public float MapLacunarity = 1.87f;
+        public Vector2 MapOffset = Vector2.zero;
+        public GenerationThreshold MapLayers;
+
+        [Header("Voronoi Settings")]
+        public int VoronoiSiteCount = 100;
+        public int VoronoiRelaxationCount = 5;
+        public VoronoiGradientMaskType VoronoiMaskType = VoronoiGradientMaskType.None;
+        [Range(0.01f, 1)]
+        public float VoronoiMaskRadius = 1.0f;
+
+        /*Generation Data*/
+        public List<MapRegion> MapRegions { get; private set; }
+        public MapRegionGPU[] MapRegionGPUs { get; private set; }
+        public KeyFrameGPU[] KeyFrameGPUs { get; private set; }
+        public Vector2[] MapOctaveOffsets { get; private set; }
+        public Vector2[] SubMapOctaveOffsets { get; private set; }
+
+        /*Builder Data*/
+        //Chunk origin and parent gameobject for generated objects
+        private GameObject ChunkOrigin;
+        private Dictionary<Vector3Int, GameObject> Chunks = new Dictionary<Vector3Int, GameObject>(9);
+
+        void OnEnable()
         {
-            float mapX = tileCoord.x / MapScale * frequency + mapOctavesOffsets[i].x;
-            float mapY = tileCoord.y / MapScale * frequency + mapOctavesOffsets[i].y;
-
-            total += Mathf.PerlinNoise(mapX, mapY) * amplitude;
-            totalAmplitude += amplitude;
-
-            amplitude *= MapPersistance;
-            frequency *= MapLacunarity;
-        }
-        return total / totalAmplitude;
-    }
-
-    public Vector2[] GetMapOctaveOffsets()
-    {
-        Vector2[] mapOctaveOffsets = new Vector2[MapOctaves];
-        for (int i = 0; i < MapOctaves; i++)
-        {
-            float offsetX = Random.Range(-100000.0f, 100000.0f) + MapOffset.x;
-            float offsetY = Random.Range(-100000.0f, 100000.0f) + MapOffset.y;
-            mapOctaveOffsets[i] = new Vector2(offsetX, offsetY);
-        }
-        return mapOctaveOffsets;
-    }
-
-    public float GradientNoise(int x, int y, int size, float radius, float heightValue, int gradientType)
-    {
-        //Smooth circle and square
-        if (gradientType == 0 || gradientType == 1)
-        {
-            //Gradient
-            float distanceX = Mathf.Abs(x - size * 0.5f);
-            float distanceY = Mathf.Abs(y - size * 0.5f);
-
-            //Circular mask
-            float distance = Mathf.Sqrt(distanceX * distanceX + distanceY * distanceY);
-
-            //square mask
-            if (gradientType == 1) distance = Mathf.Max(distanceX, distanceY);
-
-            float maxWidth = size * radius - 10.0f;
-            float delta = distance / maxWidth;
-            float gradient = delta * delta;
-
-            heightValue *= Mathf.Max(0.0f, 1.0f - gradient);
-        }
-        return heightValue;
-    }
-    #endregion
-
-    #region Voronoi Map
-    public float GenerateVoronoiMapCoordData(Vector2 tileCoord, List<MapRegion> mapRegions, KDTree tree, List<int> outputRegionIndexes = null)
-    {
-        int[] nearestKs = tree.FindNearestsK(new Vector3(tileCoord.x, 0, tileCoord.y), 3);
-        Vector2 closestSiteCoord = mapRegions[nearestKs[0]].RegionSite.Coord;
-        Vector2 secondClosestSiteCoord = mapRegions[nearestKs[1]].RegionSite.Coord;
-        float closestDistance = Vector2.Distance(closestSiteCoord, tileCoord);
-        float secondClosestDistance = Vector2.Distance(secondClosestSiteCoord, tileCoord);
-
-        if(outputRegionIndexes != null)
-        {
-            outputRegionIndexes.Add(nearestKs[0]);
-            outputRegionIndexes.Add(nearestKs[1]);
-            outputRegionIndexes.Add(nearestKs[2]);
+            if (!instance) instance = this;
+            else Debug.Log("Warning! Multiple instances of \"WorldGenerator\"");
         }
 
-        if (VoronoiBiomeMaskType == VoronoiBiomeMaskType.Radial) return 1 - Mathf.InverseLerp(0, 20, closestDistance);
-        else if (VoronoiBiomeMaskType == VoronoiBiomeMaskType.ThickBorders) return 1 - (closestDistance / secondClosestDistance);
-        else if (VoronoiBiomeMaskType == VoronoiBiomeMaskType.ThinBorders)
+        void Start()
         {
-            Vector2 secondClosestDireciton = (secondClosestSiteCoord - closestSiteCoord).normalized;
-            Vector2 edgeDirection = Vector2.Perpendicular(secondClosestDireciton);
-            Vector2 midPoint = (closestSiteCoord + secondClosestSiteCoord) * 0.5f;
+            //Init
+            MapRegions = new List<MapRegion>();
+            //Creates chunk origin gameobject
+            ChunkOrigin = new GameObject("Chunks");
+            ChunkOrigin.transform.position = Vector3.zero;
+            //Generates noise map data for calculations
+            GenerateNoiseMap();
 
-            Vector2 result = GameTools.GetNearestPointOnLine(midPoint, edgeDirection, tileCoord);
-            float resultDistance = Vector2.Distance(tileCoord, result);
-
-            //return resultDistance / (secondClosestDistance * 0.5f);
-            return resultDistance / 20;
-        }
-        return 0;
-    }
-
-    public void GenerateVoronoiGraph(List<MapRegion> outputMapRegions = null, List<List<Vector2>> outputRegions = null, List<LineSegment> outputSpanningTrees = null)
-    {
-        Rect bounds = new Rect(0, 0, MapSize.x, MapSize.y);
-        List<Vector2> points = CreateRandomPoints();
-
-        //Generates new graph
-        Voronoi voronoi = new Voronoi(points, bounds, VoronoiRelaxationCount);
-
-        //Results
-        if (outputMapRegions != null)
-        {
-            outputMapRegions.Clear();
-            List<Vector2> siteCoords = voronoi.SiteCoords();
-            Dictionary<Vector2, Site> siteDictionary = voronoi.SitesIndexedByLocation;
-            for (int i = 0; i < siteCoords.Count; i++)
+            for (int x = -2; x <= 2; x++)
             {
-                MapRegion mapRegion = new MapRegion
+                for (int z = -2; z <= 2; z++)
                 {
-                    RegionSite = siteDictionary[siteCoords[i]]
+                    for (int y = -2; y <= 2; y++)
+                    {
+                        CreateChunk(x, y, z);
+                    }
+                }
+            }
+
+            //CreateChunk(0, 0, 0);
+            //CreateChunk(1, 0, 0);
+            //CreateChunk(0, 1, 0);
+        }
+
+        #region Generation
+        void GenerateNoiseMap()
+        {
+            //Voronoi map
+            GenerateVoronoiGraph(MapRegions);
+
+            //Normal map
+            MapOctaveOffsets = GenerateMapOctaveOffsets(false);
+            RandomizeMapRegions(MapRegions, false);
+
+            //Subtractive map
+            SubMapOctaveOffsets = GenerateMapOctaveOffsets(true);
+            RandomizeMapRegions(MapRegions, true);
+
+            //GPU
+            MapRegionGPUs = CreateMapRegionGPUs(MapRegions);
+            KeyFrameGPUs = CreateMapRegionGPUs(MapLayers.LayerThreshold.keys);
+        }
+
+        void CreateChunk(int ChunkCoordX, int ChunkCoordY, int ChunkCoordZ)
+        {
+            (Vector3[], int[]) meshData = ShaderGenerateChunk(ChunkCoordX, ChunkCoordY, ChunkCoordZ);
+            //Debug.Log(meshData.Item1.Length);
+            for (int i = 0; i < 10000; i++)
+            {
+                //Debug.Log(meshData.Item1[i].x);
+                //Debug.Log(meshData.Item1[i]);
+            }
+
+            GameObject chunk = new GameObject();
+            chunk.transform.parent = ChunkOrigin.transform;
+            chunk.transform.localPosition = new Vector3(ChunkCoordX, ChunkCoordY, ChunkCoordZ) * ChunkSize;
+            MeshFilter chunkMF = chunk.AddComponent<MeshFilter>();
+            MeshRenderer chunkMR = chunk.AddComponent<MeshRenderer>();
+
+            chunkMR.material = TestMat;
+
+            Mesh mesh = new Mesh();
+            mesh.vertices = meshData.Item1;
+            mesh.triangles = meshData.Item2;
+            mesh.RecalculateNormals();
+            chunkMF.mesh = mesh;
+        }
+        #endregion
+
+        #region ComputeShader
+        public (Vector3[], int[]) ShaderGenerateChunk(int chunkCoordX, int chunkCoordY, int chunkCoordZ)
+        {
+            //Max TriangleGPU count inside a chunk, 5 possible triangles inside of TriTable, 3 pairs per triangle
+            int maxTriangleGPUCount = (CubesPerAxis * CubesPerAxis * CubesPerAxis) * 5;
+
+            //How many to process on a single thread
+            int ProcessPerThread = Mathf.CeilToInt(CubesPerAxis / 8.0f);
+
+            //Find bytes
+            int sizeOfInt;
+            int sizeOfTriangleGPU;
+            unsafe
+            {
+                sizeOfInt = sizeof(int);
+                sizeOfTriangleGPU = sizeof(TriangleGPU);
+            }
+
+            //Kernal
+            int kernel = WGShader.FindKernel("GenerateChunk");
+
+            //RWStructuredBuffer sets
+            ComputeBuffer trianglesBuffer = new ComputeBuffer(maxTriangleGPUCount, sizeOfTriangleGPU, ComputeBufferType.Append);
+            ComputeBuffer triCountBuffer = new ComputeBuffer(1, sizeOfInt, ComputeBufferType.Raw);
+            trianglesBuffer.SetCounterValue(0);
+            WGShader.SetBuffer(kernel, "Triangles", trianglesBuffer);
+
+            //Sets
+            WGShader.SetInts("ThreadDimensions", new int[3] { CubesPerAxis, CubesPerAxis, CubesPerAxis });
+            WGShader.SetFloat("CubesPerAxis", CubesPerAxis);
+
+            //Run noise kernal
+            WGShader.SetBuffer(kernel, "NoisePoints", ShaderGenerateNoiseChunk(chunkCoordX, chunkCoordY, chunkCoordZ, MapOctaveOffsets, SubMapOctaveOffsets, MapRegionGPUs, KeyFrameGPUs));
+
+            //Run kernal
+            WGShader.Dispatch(kernel, ProcessPerThread, ProcessPerThread, ProcessPerThread);
+
+            //Grab output count
+            ComputeBuffer.CopyCount(trianglesBuffer, triCountBuffer, 0);
+            int[] triCount = { 0 };
+            triCountBuffer.GetData(triCount);
+
+            //Outputs
+            TriangleGPU[] triangleGPUOutput = new TriangleGPU[triCount[0]];
+            Vector3[] verticesOutput = new Vector3[triangleGPUOutput.Length * 3];
+            int[] trianglesOutput = new int[triangleGPUOutput.Length * 3];
+
+            //Grab outputs
+            trianglesBuffer.GetData(triangleGPUOutput, 0, 0, triCount[0]);
+
+            //Get rid of buffer data
+            trianglesBuffer.Dispose();
+            triCountBuffer.Dispose();
+
+            //Process triangles
+            for (int i = 0; i < triangleGPUOutput.Length; i++)
+            {
+                verticesOutput[i * 3] = triangleGPUOutput[i].vertexA;
+                verticesOutput[(i * 3) + 1] = triangleGPUOutput[i].vertexB;
+                verticesOutput[(i * 3) + 2] = triangleGPUOutput[i].vertexC;
+
+                trianglesOutput[i * 3] = i * 3;
+                trianglesOutput[(i * 3) + 1] = (i * 3) + 1;
+                trianglesOutput[(i * 3) + 2] = (i * 3) + 2;
+            }
+
+            return (verticesOutput, trianglesOutput);
+        }
+
+        public ComputeBuffer ShaderGenerateNoiseChunk(int chunkCoordX, int chunkCoordY, int chunkCoordZ, Vector2[] mapOctaveOffsets, Vector2[] mapSubOctaveOffsets, MapRegionGPU[] mapRegionGPUs, KeyFrameGPU[] keyFrameGPUs)
+        {
+            //How many to process on a single thread
+            int ProcessPerThread = Mathf.CeilToInt(CubesPerAxis / 8.0f);
+
+            //Outputs
+            Vector4[] noisePointsOutput = new Vector4[CubesPerAxis * CubesPerAxis * CubesPerAxis];
+
+            //Find bytes
+            int sizeOfVector4;
+            int sizeOfVector2;
+            int sizeOfMapRegionGPUs;
+            int sizeOfKeyFrameGPUs;
+            unsafe
+            {
+                sizeOfVector4 = sizeof(Vector4);
+                sizeOfVector2 = sizeof(Vector2);
+                sizeOfMapRegionGPUs = sizeof(MapRegionGPU);
+                sizeOfKeyFrameGPUs = sizeof(KeyFrameGPU);
+            }
+
+            //Kernal
+            int kernel = WGNoiseShader.FindKernel("Noise");
+
+            //RWStructuredBuffer sets
+            ComputeBuffer noisePointsBuffer = new ComputeBuffer(noisePointsOutput.Length, sizeOfVector4);
+            noisePointsBuffer.SetData(noisePointsOutput);
+            WGNoiseShader.SetBuffer(kernel, "NoisePoints", noisePointsBuffer);
+
+            //Sets
+            WGNoiseShader.SetInts("ThreadDimensions", new int[3] { CubesPerAxis, CubesPerAxis, CubesPerAxis });
+            WGNoiseShader.SetInts("ChunkCoord", new int[3] { chunkCoordX, chunkCoordY, chunkCoordZ });
+            WGNoiseShader.SetFloat("ChunkSize", ChunkSize);
+            WGNoiseShader.SetFloat("CubesPerAxis", CubesPerAxis);
+            WGNoiseShader.SetFloat("MapScale", MapScale);
+            WGNoiseShader.SetFloat("MapPersistance", MapPersistance);
+            WGNoiseShader.SetFloat("MapLacunarity", MapLacunarity);
+            WGNoiseShader.SetInt("Octaves", MapOctaves);
+            WGNoiseShader.SetInt("Sites", mapRegionGPUs.Length);
+            WGNoiseShader.SetInt("Thresholds", keyFrameGPUs.Length);
+
+            //StructuredBuffer sets
+            ComputeBuffer mapOctaveOffsetsBuffer = new ComputeBuffer(mapOctaveOffsets.Length, sizeOfVector2);
+            ComputeBuffer mapSubOctaveOffsetsBuffer = new ComputeBuffer(mapSubOctaveOffsets.Length, sizeOfVector2);
+            ComputeBuffer mapRegionGPUsBuffer = new ComputeBuffer(mapRegionGPUs.Length, sizeOfMapRegionGPUs);
+            ComputeBuffer keyFrameGPUsBuffer = new ComputeBuffer(keyFrameGPUs.Length, sizeOfKeyFrameGPUs);
+            mapOctaveOffsetsBuffer.SetData(mapOctaveOffsets);
+            mapSubOctaveOffsetsBuffer.SetData(mapSubOctaveOffsets);
+            mapRegionGPUsBuffer.SetData(mapRegionGPUs);
+            keyFrameGPUsBuffer.SetData(keyFrameGPUs);
+            WGNoiseShader.SetBuffer(kernel, "MapOctaveOffsets", mapOctaveOffsetsBuffer);
+            WGNoiseShader.SetBuffer(kernel, "SubMapOctaveOffsets", mapSubOctaveOffsetsBuffer);
+            WGNoiseShader.SetBuffer(kernel, "MapRegions", mapRegionGPUsBuffer);
+            WGNoiseShader.SetBuffer(kernel, "ThresholdFrames", keyFrameGPUsBuffer);
+
+            //Run kernal
+            WGNoiseShader.Dispatch(kernel, ProcessPerThread, ProcessPerThread, ProcessPerThread);
+
+            //Get rid of buffer data
+            mapOctaveOffsetsBuffer.Dispose();
+            mapSubOctaveOffsetsBuffer.Dispose();
+            mapRegionGPUsBuffer.Dispose();
+            keyFrameGPUsBuffer.Dispose();
+
+            return noisePointsBuffer;
+        }
+        #endregion
+
+        #region Setup
+        public void GenerateVoronoiGraph(List<MapRegion> outputMapRegions = null, List<List<Vector2>> outputRegions = null, List<LineSegment> outputSpanningTrees = null)
+        {
+            Rect bounds = new Rect(0, 0, MapSize.x, MapSize.y);
+            List<Vector2> points = CreateRandomPoints();
+
+            //Generates new graph
+            Voronoi voronoi = new Voronoi(points, bounds, VoronoiRelaxationCount);
+
+            //Results
+            if (outputMapRegions != null)
+            {
+                outputMapRegions.Clear();
+                List<Vector2> siteCoords = voronoi.SiteCoords();
+                Dictionary<Vector2, Site> siteDictionary = voronoi.SitesIndexedByLocation;
+                for (int i = 0; i < siteCoords.Count; i++)
+                {
+                    MapRegion mapRegion = new MapRegion
+                    {
+                        RegionSite = siteDictionary[siteCoords[i]]
+                    };
+                    outputMapRegions.Add(mapRegion);
+                }
+            }
+            if (outputRegions != null)
+            {
+                outputRegions.Clear();
+                outputRegions.AddRange(voronoi.Regions());
+            }
+            if (outputSpanningTrees != null)
+            {
+                outputSpanningTrees.Clear();
+                outputSpanningTrees.AddRange(voronoi.SpanningTree(KruskalType.MINIMUM));
+            }
+        }
+
+        public List<Vector2> CreateRandomPoints()
+        {
+            Random.InitState(MapSeed.GetHashCode());
+            List<Vector2> points = new List<Vector2>();
+
+            Vector2 center = new Vector3(MapSize.x * 0.5f, MapSize.y * 0.5f);
+            for (int i = 0; i < VoronoiSiteCount; i++)
+            {
+                if (VoronoiMaskType == VoronoiGradientMaskType.Circle)
+                {
+                    Vector2 randomPoint = UnityEngine.Random.insideUnitCircle;
+                    points.Add(center + new Vector2(randomPoint.x, randomPoint.y) * ((MapSize.x * 0.5f) * VoronoiMaskRadius));
+                }
+                else points.Add(new Vector2(Random.Range(0, MapSize.x), Random.Range(0, MapSize.y)));
+            }
+            return points;
+        }
+
+        public Vector2[] GenerateMapOctaveOffsets(bool IsSubtractive)
+        {
+            Random.InitState(IsSubtractive ? -MapSeed.GetHashCode() : MapSeed.GetHashCode());
+            Vector2[] mapOctaveOffsets = new Vector2[MapOctaves];
+            for (int i = 0; i < MapOctaves; i++)
+            {
+                float offsetX = Random.Range(-100000.0f, 100000.0f) + MapOffset.x;
+                float offsetY = Random.Range(-100000.0f, 100000.0f) + MapOffset.y;
+                mapOctaveOffsets[i] = new Vector2(offsetX, offsetY);
+            }
+            return mapOctaveOffsets;
+        }
+
+        public void RandomizeMapRegions(List<MapRegion> mapRegions, bool IsSubtractive)
+        {
+            Random.InitState(IsSubtractive ? -MapSeed.GetHashCode() : MapSeed.GetHashCode());
+
+            //Might change this later so that it chooses from a list of presets randomly instead of fully random
+            for (int i = 0; i < mapRegions.Count; i++)
+            {
+                //Generate names
+                //Generate modifiers
+                int chance = Random.Range(0, 2);
+                if (chance == 0)
+                {
+                    if (!IsSubtractive)
+                    {
+                        mapRegions[i].RegionType = 1;
+                        mapRegions[i].GenerationModifier = 2.0f;
+                    }
+                    else
+                    {
+                        mapRegions[i].CaveRegionType = 1;
+                        mapRegions[i].GenerationCaveModifier = 2.0f;
+                    }
+                }
+                else
+                {
+                    if (!IsSubtractive)
+                    {
+                        mapRegions[i].RegionType = 0;
+                        mapRegions[i].GenerationModifier = 0.0f;
+                    }
+                    else
+                    {
+                        mapRegions[i].CaveRegionType = 0;
+                        mapRegions[i].GenerationCaveModifier = 0.0f;
+                    }
+                }
+            }
+        }
+
+        public MapRegionGPU[] CreateMapRegionGPUs(List<MapRegion> mapRegions)
+        {
+            MapRegionGPU[] mapRegionGPUs = new MapRegionGPU[mapRegions.Count];
+            for (int i = 0; i < mapRegions.Count; i++)
+            {
+                MapRegionGPU mapRegionGPU = new MapRegionGPU
+                {
+                    RegionType = mapRegions[i].RegionType,
+                    CaveRegionType = mapRegions[i].CaveRegionType,
+                    Coord = mapRegions[i].RegionSite.Coord,
+                    GenerationModifier = mapRegions[i].GenerationModifier,
+                    GenerationCaveModifier = mapRegions[i].GenerationCaveModifier
                 };
-                outputMapRegions.Add(mapRegion);
+                mapRegionGPUs[i] = mapRegionGPU;
             }
+            return mapRegionGPUs;
         }
-        if (outputRegions != null)
-        {
-            outputRegions.Clear();
-            outputRegions.AddRange(voronoi.Regions());
-        }
-        if (outputSpanningTrees != null)
-        {
-            outputSpanningTrees.Clear();
-            outputSpanningTrees.AddRange(voronoi.SpanningTree(KruskalType.MINIMUM));
-        }
-    }
 
-    public List<Vector2> CreateRandomPoints()
-    {
-        List<Vector2> points = new List<Vector2>();
-
-        Vector2 center = new Vector3(MapSize.x * 0.5f, MapSize.y * 0.5f);
-        for (int i = 0; i < VoronoiSiteCount; i++)
+        public KeyFrameGPU[] CreateMapRegionGPUs(Keyframe[] keyframes)
         {
-            if (VoronoiMaskType == VoronoiGradientMaskType.Circle)
+            KeyFrameGPU[] keyFrameGPUs = new KeyFrameGPU[keyframes.Length];
+            for (int i = 0; i < keyframes.Length; i++)
             {
-                Vector2 randomPoint = UnityEngine.Random.insideUnitCircle;
-                points.Add(center + new Vector2(randomPoint.x, randomPoint.y) * ((MapSize.x * 0.5f) * VoronoiMaskRadius));
+                KeyFrameGPU keyFrameGPU = new KeyFrameGPU
+                {
+                    FrameTime = keyframes[i].time,
+                    FrameValue = keyframes[i].value
+                };
+                keyFrameGPUs[i] = keyFrameGPU;
             }
-            else points.Add(new Vector2(Random.Range(0, MapSize.x), Random.Range(0, MapSize.y)));
+            return keyFrameGPUs;
         }
-        return points;
+        #endregion
     }
-
-    public KDTree CreateKDTree(List<MapRegion> mapRegions)
-    {
-        Vector3[] convertedSiteCoords = new Vector3[mapRegions.Count];
-        for (int i = 0; i < convertedSiteCoords.Length; i++) convertedSiteCoords[i] = new Vector3(mapRegions[i].RegionSite.x, 0, mapRegions[i].RegionSite.y);
-
-        return KDTree.MakeFromPoints(convertedSiteCoords);
-    }
-
-    public void RandomizeMapRegions(ref List<MapRegion> mapRegions)
-    {
-        //Might change this later so that it chooses from a list of presets randomly instead of fully random
-        for(int i = 0; i < mapRegions.Count; i++)
-        {
-            //Generate names
-            //Generate modifiers
-            int chance = Random.Range(0, 2);
-            if(chance == 0)
-            {
-                mapRegions[i].RegionType = 1;
-                mapRegions[i].GenerationModifier = 2.0f;
-                mapRegions[i].GenerationCaveModifier = 1.0f;
-            }
-            else
-            {
-                mapRegions[i].RegionType = 0;
-                mapRegions[i].GenerationModifier = 0.0f;
-                mapRegions[i].GenerationCaveModifier = 1.0f;
-            }
-        }
-    }
-    #endregion
 }
