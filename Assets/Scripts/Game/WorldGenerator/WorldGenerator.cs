@@ -17,11 +17,12 @@ namespace COM
         public ComputeShader WGNoiseShader;
         public string MapSeed = "Seed";
         public Vector2Int MapSize = new Vector2Int(150, 150);
-        public float IsoLevel = 8;
+        public float IsoSurface = 8;
         public int CubesPerAxis = 30;
         public float ChunkSize = 10;
         public GameObject TestSpawn;
         public Material TestMat;
+        private List<GameObject> TestChunks = new List<GameObject>();
 
 
         [Header("Base Settings")]
@@ -67,20 +68,44 @@ namespace COM
             //Generates noise map data for calculations
             GenerateNoiseMap();
 
-            for (int x = -2; x <= 2; x++)
-            {
-                for (int z = -2; z <= 2; z++)
-                {
-                    for (int y = -2; y <= 2; y++)
-                    {
-                        CreateChunk(x, y, z);
-                    }
-                }
-            }
+            //for (int x = -2; x <= 2; x++)
+            //{
+            //    for (int z = -2; z <= 2; z++)
+            //    {
+            //        for (int y = -2; y <= 2; y++)
+            //        {
+            //            CreateChunk(x, y, z);
+            //        }
+            //    }
+            //}
 
             //CreateChunk(0, 0, 0);
             //CreateChunk(1, 0, 0);
             //CreateChunk(0, 1, 0);
+        }
+
+        void Update()
+        {
+            for (int i = 0; i < TestChunks.Count; i++)
+            {
+                Destroy(TestChunks[i]);
+                TestChunks.RemoveAt(i);
+                i--;
+            }
+            CreateChunk(0, 0, 0);
+            CreateChunk(1, 0, 0);
+            CreateChunk(-1, 0, 0);
+            CreateChunk(0, 0, 1);
+            //for (int x = -1; x <= 1; x++)
+            //{
+            //    for (int z = -1; z <= 1; z++)
+            //    {
+            //        for (int y = -1; y <= 1; y++)
+            //        {
+            //            CreateChunk(x, y, z);
+            //        }
+            //    }
+            //}
         }
 
         #region Generation
@@ -105,12 +130,6 @@ namespace COM
         void CreateChunk(int ChunkCoordX, int ChunkCoordY, int ChunkCoordZ)
         {
             (Vector3[], int[]) meshData = ShaderGenerateChunk(ChunkCoordX, ChunkCoordY, ChunkCoordZ);
-            //Debug.Log(meshData.Item1.Length);
-            for (int i = 0; i < 10000; i++)
-            {
-                //Debug.Log(meshData.Item1[i].x);
-                //Debug.Log(meshData.Item1[i]);
-            }
 
             GameObject chunk = new GameObject();
             chunk.transform.parent = ChunkOrigin.transform;
@@ -121,10 +140,12 @@ namespace COM
             chunkMR.material = TestMat;
 
             Mesh mesh = new Mesh();
+            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             mesh.vertices = meshData.Item1;
             mesh.triangles = meshData.Item2;
             mesh.RecalculateNormals();
             chunkMF.mesh = mesh;
+            TestChunks.Add(chunk);
         }
         #endregion
 
@@ -157,10 +178,12 @@ namespace COM
 
             //Sets
             WGShader.SetInts("ThreadDimensions", new int[3] { CubesPerAxis, CubesPerAxis, CubesPerAxis });
+            WGShader.SetFloat("IsoSurface", IsoSurface);
             WGShader.SetFloat("CubesPerAxis", CubesPerAxis);
 
             //Run noise kernal
-            WGShader.SetBuffer(kernel, "NoisePoints", ShaderGenerateNoiseChunk(chunkCoordX, chunkCoordY, chunkCoordZ, MapOctaveOffsets, SubMapOctaveOffsets, MapRegionGPUs, KeyFrameGPUs));
+            ComputeBuffer noisePointsBuffer = ShaderGenerateNoiseChunk(chunkCoordX, chunkCoordY, chunkCoordZ, MapOctaveOffsets, SubMapOctaveOffsets, MapRegionGPUs, KeyFrameGPUs);
+            WGShader.SetBuffer(kernel, "NoisePoints", noisePointsBuffer);
 
             //Run kernal
             WGShader.Dispatch(kernel, ProcessPerThread, ProcessPerThread, ProcessPerThread);
@@ -181,6 +204,7 @@ namespace COM
             //Get rid of buffer data
             trianglesBuffer.Dispose();
             triCountBuffer.Dispose();
+            noisePointsBuffer.Dispose();
 
             //Process triangles
             for (int i = 0; i < triangleGPUOutput.Length; i++)
@@ -230,6 +254,7 @@ namespace COM
             WGNoiseShader.SetInts("ThreadDimensions", new int[3] { CubesPerAxis, CubesPerAxis, CubesPerAxis });
             WGNoiseShader.SetInts("ChunkCoord", new int[3] { chunkCoordX, chunkCoordY, chunkCoordZ });
             WGNoiseShader.SetFloat("ChunkSize", ChunkSize);
+            WGNoiseShader.SetFloat("IsoSurface", IsoSurface);
             WGNoiseShader.SetFloat("CubesPerAxis", CubesPerAxis);
             WGNoiseShader.SetFloat("MapScale", MapScale);
             WGNoiseShader.SetFloat("MapPersistance", MapPersistance);

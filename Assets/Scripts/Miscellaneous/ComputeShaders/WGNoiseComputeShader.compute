@@ -7,6 +7,7 @@ RWStructuredBuffer<float4> NoisePoints;
 
 /*Shared data*/
 int3 ChunkCoord;
+float IsoSurface;
 float ChunkSize;
 float CubesPerAxis;
 
@@ -50,10 +51,16 @@ void Noise(uint3 id : SV_DispatchThreadID)
     int subLayer = Evaluate(subCombinedHeight, ThresholdFrames, Thresholds);
 
     //If above the cave layer
-    if (worldCoord.y >= subLayer && worldCoord.y < layer)
+    //if (worldCoord.y >= subLayer && worldCoord.y < layer)
+    //{
+    //    NoisePoints[index] = float4(localCoord.x, localCoord.y, localCoord.z, localCoord.y);
+    //    return;
+    //}
+    //NoisePoints[index] = float4(localCoord.x, localCoord.y, localCoord.z, IsoSurface + 1);
+    if (worldCoord.y < layer)
     {
-        NoisePoints[index] = float4(localCoord.x, localCoord.y, localCoord.z, 0);
+        NoisePoints[index] = float4(localCoord.x, localCoord.y, localCoord.z, localCoord.y);
         return;
     }
-    NoisePoints[index] = float4(localCoord.x, localCoord.y, localCoord.z, 1);
+    NoisePoints[index] = float4(localCoord.x, localCoord.y, localCoord.z, IsoSurface + 1);
 }
