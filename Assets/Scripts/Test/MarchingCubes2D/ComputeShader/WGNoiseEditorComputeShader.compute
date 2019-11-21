@@ -1,6 +1,6 @@
 ﻿#pragma kernel NoiseEditor
 #include "/Includes/Math.compute"
-#include "/Includes/Noise2D.compute"
+#include "/Includes/Noise.compute"
 
 struct WGEditorOutputGPU
 {
@@ -41,9 +41,9 @@ void NoiseEditor(uint3 id : SV_DispatchThreadID)
     float combinedHeight = BiomeBlend(normHeight, voronoiHeight, float2(chunkCoordX, chunkCoordY), regionIndexes, false);
 
 	//Subtractive map
-    //float subHeight = Perlin(chunkCoordX, chunkCoordY, SubMapOctaveOffsets);
-    //float subVoronoiMatchHeight = BiomeBlendSubtrativeView(subHeight, voronoiHeight, float2(chunkCoordX, chunkCoordY), regionIndexes, true, false);
-    //float subCombinedHeight = BiomeBlendSubtrative(subHeight, voronoiHeight, float2(chunkCoordX, chunkCoordY), regionIndexes, true);
+    float subHeight = Perlin(chunkCoordX, chunkCoordY, SubMapOctaveOffsets);
+    float subVoronoiMatchHeight = BiomeBlendSubtrativeView(subHeight, voronoiHeight, float2(chunkCoordX, chunkCoordY), regionIndexes, true, false);
+    float subCombinedHeight = BiomeBlendSubtrative(subHeight, voronoiHeight, float2(chunkCoordX, chunkCoordY), regionIndexes, true);
 
     Heights[index].coord.x = chunkCoordX;
     Heights[index].coord.y = chunkCoordY;
@@ -51,7 +51,7 @@ void NoiseEditor(uint3 id : SV_DispatchThreadID)
     Heights[index].normHeight = normHeight;
     Heights[index].voronoiMatchHeight = voronoiMatchHeight;
     Heights[index].combinedHeight = combinedHeight;
-    //Heights[index].subHeight = subHeight;
-    //Heights[index].subVoronoiMatchHeight = subVoronoiMatchHeight;
-    //Heights[index].subCombinedHeight = subCombinedHeight;
+    Heights[index].subHeight = subHeight;
+    Heights[index].subVoronoiMatchHeight = subVoronoiMatchHeight;
+    Heights[index].subCombinedHeight = subCombinedHeight;
 }

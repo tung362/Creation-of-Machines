@@ -1,4 +1,4 @@
-﻿#include "/SimpleNoise.compute"
+﻿#include "/SimpleNoise2D.compute"
 
 struct MapRegionGPU
 {
@@ -10,11 +10,19 @@ struct MapRegionGPU
     float GenerationCaveModifier;
 };
 
-/*Voronoi data*/
+//Perlin data
+float MapScale;
+float MapPersistance;
+float MapLacunarity;
+int Octaves;
+StructuredBuffer<float2> MapOctaveOffsets;
+StructuredBuffer<float2> SubMapOctaveOffsets;
+
+//Voronoi data
 int Sites;
 StructuredBuffer<MapRegionGPU> MapRegions;
 
-float Perlin(float x, float y, float z, float scale, float presistance, float lacunarity, int octaves, StructuredBuffer<float3> mapOctaveOffsets)
+float Perlin(float x, float y, StructuredBuffer<float2> mapOctaveOffsets)
 {
 	//Height value
     float total = 0;
@@ -22,19 +30,19 @@ float Perlin(float x, float y, float z, float scale, float presistance, float la
     float amplitude = 1;
     float totalAmplitude = 0;
 
-    for (int i = 0; i < octaves; i++)
+    for (int i = 0; i < Octaves; i++)
     {
-        float mapX = x / scale * frequency + mapOctaveOffsets[i].x;
-        float mapY = y / scale * frequency + mapOctaveOffsets[i].y;
-        float mapZ = z / scale * frequency + mapOctaveOffsets[i].z;
+        float mapX = x / MapScale * frequency + mapOctaveOffsets[i].x;
+        float mapY = y / MapScale * frequency + mapOctaveOffsets[i].y;
 
-        total += cnoise(float3(mapX, mapY, mapZ)) * amplitude;
+        total += cnoise(float2(mapX, mapY)) * amplitude;
         totalAmplitude += amplitude;
 
-        amplitude *= presistance;
-        frequency *= lacunarity;
+        amplitude *= MapPersistance;
+        frequency *= MapLacunarity;
     }
-    //total = abs(total);
+    total = abs(total);
+
     return total;
 }
 
@@ -96,7 +104,7 @@ float BlendDistance(float2 coord, int closestIndex, int closestKIndex)
     return 1 - (closestDistance / closestKDistance);
 }
 
-float BiomeBlend(float baseHeight, float voronoiBaseHeight, float2 coord, int regionIndexes[3])
+float BiomeBlend(float baseHeight, float voronoiBaseHeight, float2 coord, int regionIndexes[3], bool isSubtractive)
 {
     float result = baseHeight * lerp(1, MapRegions[regionIndexes[0]].GenerationModifier, voronoiBaseHeight);
 
@@ -114,7 +122,25 @@ float BiomeBlend(float baseHeight, float voronoiBaseHeight, float2 coord, int re
     return result;
 }
 
-float BiomeBlendView(float baseHeight, float voronoiBaseHeight, float2 coord, int regionIndexes[3], bool fullBlendView)
+float BiomeBlendSubtrative(float baseHeight, float voronoiBaseHeight, float2 coord, int regionIndexes[3], bool isSubtractive)
+{
+    float result = baseHeight * lerp(1, MapRegions[regionIndexes[0]].GenerationCaveModifier, voronoiBaseHeight);
+
+    //If the closest region's type is the same as the second closest region's type
+    if (MapRegions[regionIndexes[0]].CaveRegionType == MapRegions[regionIndexes[1]].CaveRegionType)
+    {
+        result = baseHeight * MapRegions[regionIndexes[0]].GenerationCaveModifier;
+
+        //If the closest region's type is not the same as the third closest region's type
+        if (MapRegions[regionIndexes[0]].CaveRegionType != MapRegions[regionIndexes[2]].CaveRegionType)
+        {
+            result = baseHeight * lerp(1, MapRegions[regionIndexes[0]].GenerationCaveModifier, BlendDistance(coord, regionIndexes[0], regionIndexes[2]));
+        }
+    }
+    return result;
+}
+
+float BiomeBlendView(float baseHeight, float voronoiBaseHeight, float2 coord, int regionIndexes[3], bool isSubtractive, bool fullBlendView)
 {
 	float blendView = voronoiBaseHeight;
     //If the closest region's type is the same as the second closest region's type
@@ -124,6 +150,24 @@ float BiomeBlendView(float baseHeight, float voronoiBaseHeight, float2 coord, in
 
         //If the closest region's type is not the same as the third closest region's type
         if (MapRegions[regionIndexes[0]].RegionType != MapRegions[regionIndexes[2]].RegionType)
+        {
+            if (fullBlendView) blendView = BlendDistance(coord, regionIndexes[0], regionIndexes[2]);
+			else blendView = 0;
+        }
+    }
+    return blendView;
+}
+
+float BiomeBlendSubtrativeView(float baseHeight, float voronoiBaseHeight, float2 coord, int regionIndexes[3], bool isSubtractive, bool fullBlendView)
+{
+    float blendView = voronoiBaseHeight;
+    //If the closest region's type is the same as the second closest region's type
+    if (MapRegions[regionIndexes[0]].CaveRegionType == MapRegions[regionIndexes[1]].CaveRegionType)
+    {
+        blendView = 1;
+
+        //If the closest region's type is not the same as the third closest region's type
+        if (MapRegions[regionIndexes[0]].CaveRegionType != MapRegions[regionIndexes[2]].CaveRegionType)
         {
             if (fullBlendView) blendView = BlendDistance(coord, regionIndexes[0], regionIndexes[2]);
 			else blendView = 0;

@@ -5,22 +5,35 @@
 /*Output*/
 RWStructuredBuffer<float4> NoisePoints;
 
+/*Perlin data*/
+//General
+float IsoSurface;
+//Surface
+float SurfaceScale;
+float SurfacePersistance;
+float SurfaceLacunarity;
+float TerrainHeight;
+float TerrainFloor;
+int SurfaceOctaves;
+StructuredBuffer<float3> SurfaceOctaveOffsets;
+//Caves
+float CaveScale;
+float CavePersistance;
+float CaveLacunarity;
+float CaveThreshold;
+int CaveOctaves;
+StructuredBuffer<float3> CaveOctaveOffsets;
+
 /*Shared data*/
 int3 ChunkCoord;
-float IsoSurface;
 float ChunkSize;
 float CubesPerAxis;
-
-/*Builder*/
-int Thresholds;
-StructuredBuffer<KeyFrameGPU> ThresholdFrames;
 
 [numthreads(8, 8, 8)]
 void Noise(uint3 id : SV_DispatchThreadID)
 {
     //Prevents out of bounds, use 1 dimension smaller so chunks don't overlap
-    if (id.x >= CubesPerAxis || id.y >= CubesPerAxis || id.z >= CubesPerAxis)
-        return;
+    if (id.x >= CubesPerAxis || id.y >= CubesPerAxis || id.z >= CubesPerAxis) return;
 
     //How far apart each cube is scaled to the chunk's size
     float cubesChunkOffset = ChunkSize / (CubesPerAxis - 1);
@@ -31,36 +44,27 @@ void Noise(uint3 id : SV_DispatchThreadID)
 
     //World space
     float3 worldCoord = float3((ChunkCoord.x * ChunkSize) + (id.x * cubesChunkOffset), (ChunkCoord.y * ChunkSize) + (id.y * cubesChunkOffset), (ChunkCoord.z * ChunkSize) + (id.z * cubesChunkOffset));
-
-    bool gridTileIsEmpty = true;
 	
 	//Voronoi map
     int regionIndexes[3];
     float voronoiHeight = Voronoi(worldCoord.x, worldCoord.z, regionIndexes);
 	
 	//Normal map
-    float normHeight = Perlin(worldCoord.x, worldCoord.z, MapOctaveOffsets);
-    float combinedHeight = BiomeBlend(normHeight, voronoiHeight, float2(worldCoord.x, worldCoord.z), regionIndexes, false);
+    float normHeight = Perlin(worldCoord.x, worldCoord.y, worldCoord.z, SurfaceScale, SurfacePersistance, SurfaceLacunarity, SurfaceOctaves, SurfaceOctaveOffsets);
+    float combinedHeight = BiomeBlend(normHeight, voronoiHeight, float2(worldCoord.x, worldCoord.z), regionIndexes);
 
-	//Subtractive map
-    float subHeight = Perlin(worldCoord.x, worldCoord.z, SubMapOctaveOffsets);
-    float subCombinedHeight = BiomeBlendSubtrative(subHeight, voronoiHeight, float2(worldCoord.x, worldCoord.z), regionIndexes, true);
+    //Subtractive map
+    float subHeight = Perlin(worldCoord.x, worldCoord.y, worldCoord.z, CaveScale, CavePersistance, CaveLacunarity, CaveOctaves, CaveOctaveOffsets);
+    float combinedSubHeight = BiomeBlend(subHeight, voronoiHeight, float2(worldCoord.x, worldCoord.z), regionIndexes);
 
-	//3D height of the combined noise
-    int layer = Evaluate(combinedHeight, ThresholdFrames, Thresholds);
-    int subLayer = Evaluate(subCombinedHeight, ThresholdFrames, Thresholds);
+    //Surface level
+    float noise = (worldCoord.y - TerrainFloor) + normHeight * TerrainHeight /*+ (y % 3.0f)*/;
+    noise = noise * 3;
 
-    //If above the cave layer
-    //if (worldCoord.y >= subLayer && worldCoord.y < layer)
-    //{
-    //    NoisePoints[index] = float4(localCoord.x, localCoord.y, localCoord.z, localCoord.y);
-    //    return;
-    //}
-    //NoisePoints[index] = float4(localCoord.x, localCoord.y, localCoord.z, IsoSurface + 1);
-    if (worldCoord.y < layer)
-    {
-        NoisePoints[index] = float4(localCoord.x, localCoord.y, localCoord.z, localCoord.y);
-        return;
-    }
-    NoisePoints[index] = float4(localCoord.x, localCoord.y, localCoord.z, IsoSurface + 1);
+    //if (normHeight <= IsoSurface) noise = (worldCoord.y - (TerrainFloor + TerrainFloorOffset)) + normHeight * TerrainHeight /*+ (y % 3.0f)*/;
+
+    //Cave level
+    if (subHeight >= CaveThreshold) noise = 1;
+
+    NoisePoints[index] = float4(localCoord.x, localCoord.y, localCoord.z, noise);
 }

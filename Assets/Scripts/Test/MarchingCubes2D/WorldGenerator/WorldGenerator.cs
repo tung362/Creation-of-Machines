@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using csDelaunay;
 
-namespace COM
+namespace COM.Test2
 {
     public class WorldGenerator : MonoBehaviour
     {
@@ -17,30 +17,21 @@ namespace COM
         public ComputeShader WGNoiseShader;
         public string MapSeed = "Seed";
         public Vector2Int MapSize = new Vector2Int(152, 152);
-        public int ViewSize = 1;
-        public float IsoSurface = 0.62f;
+        public float IsoSurface = 10;
         public int CubesPerAxis = 30;
         public float ChunkSize = 10;
-        public Vector3 MapOffset = Vector3.zero;
+        public float TerrainHeight = 10;
         public GameObject TestSpawn;
         public Material TestMat;
         private List<MeshFilter> TestChunks = new List<MeshFilter>();
 
-        [Header("Surface Settings")]
-        public int SurfaceOctaves = 4;
-        public float SurfaceScale = 30;
-        public float SurfacePersistance = 0.53f;
-        public float SurfaceLacunarity = 1.87f;
-        public float SurfaceFloor = 12;
-        public float SurfaceHeight = 10;
-
-        [Header("Cave Settings")]
-        public float CaveThreshold = 0.62f;
-        public int CaveOctaves = 4;
-        public float CaveScale = 30;
-        public float CavePersistance = 0.53f;
-        public float CaveLacunarity = 1.87f;
-
+        [Header("Base Settings")]
+        public float MapScale = 30;
+        public int MapOctaves = 4;
+        public float MapPersistance = 0.53f;
+        public float MapLacunarity = 1.87f;
+        public Vector2 MapOffset = Vector2.zero;
+        public GenerationThreshold MapLayers;
 
         [Header("Voronoi Settings")]
         public int VoronoiSiteCount = 100;
@@ -53,15 +44,13 @@ namespace COM
         //Generation map
         public List<MapRegion> MapRegions { get; private set; }
         public MapRegionGPU[] MapRegionGPUs { get; private set; }
-        public Vector3[] SurfaceOctaveOffsets { get; private set; }
-        public Vector3[] CaveOctaveOffsets { get; private set; }
+        public Vector2[] MapOctaveOffsets { get; private set; }
+        public Vector2[] SubMapOctaveOffsets { get; private set; }
 
         //Builder
         //Chunk origin and parent gameobject for generated objects
         private GameObject ChunkOrigin;
         private Dictionary<Vector3Int, GameObject> Chunks = new Dictionary<Vector3Int, GameObject>(9);
-
-        private bool IsReady = false;
 
         void OnEnable()
         {
@@ -69,7 +58,7 @@ namespace COM
             else Debug.Log("Warning! Multiple instances of \"WorldGenerator\"");
         }
 
-        void Awake()
+        void Start()
         {
             //Init
             MapRegions = new List<MapRegion>();
@@ -81,47 +70,48 @@ namespace COM
             //Generates noise map data for calculations
             GenerateNoiseMap();
 
-            //CreateChunk(0, 0, 0);
-            for (int x = -ViewSize; x <= ViewSize; x++)
+            for (int x = -1; x <= 1; x++)
             {
-                for (int z = -ViewSize; z <= ViewSize; z++)
+                for (int z = -1; z <= 1; z++)
                 {
-                    for (int y = -ViewSize; y <= ViewSize; y++)
+                    for (int y = -1; y <= 1; y++)
                     {
                         CreateChunk(x, y, z);
                     }
                 }
             }
-            IsReady = true;
         }
 
         void Update()
         {
-        }
+            //for (int i = 0; i < TestChunks.Count; i++)
+            //{
+            //    Destroy(TestChunks[i].sharedMesh);
+            //    Destroy(TestChunks[i].gameObject);
+            //    TestChunks.RemoveAt(i);
+            //    i--;
+            //}
+            //CreateChunk(0, 0, 0);
+            //CreateChunk(1, 0, 0);
+            //CreateChunk(-1, 0, 0);
+            //CreateChunk(0, 0, 1);
+            //CreateChunk(0, 0, -1);
 
-        void OnValidate()
-        {
-            if(Application.isPlaying && IsReady)
-            {
-                for (int i = 0; i < TestChunks.Count; i++)
-                {
-                    Destroy(TestChunks[i].sharedMesh);
-                    Destroy(TestChunks[i].gameObject);
-                    TestChunks.RemoveAt(i);
-                    i--;
-                }
-
-                for (int x = -ViewSize; x <= ViewSize; x++)
-                {
-                    for (int z = -ViewSize; z <= ViewSize; z++)
-                    {
-                        for (int y = -ViewSize; y <= ViewSize; y++)
-                        {
-                            CreateChunk(x, y, z);
-                        }
-                    }
-                }
-            }
+            //CreateChunk(0, 1, 0);
+            //CreateChunk(1, 1, 0);
+            //CreateChunk(-1, 1, 0);
+            //CreateChunk(0, 1, 1);
+            //CreateChunk(0, 1, -1);
+            //for (int x = -1; x <= 1; x++)
+            //{
+            //    for (int z = -1; z <= 1; z++)
+            //    {
+            //        for (int y = -1; y <= 1; y++)
+            //        {
+            //            CreateChunk(x, y, z);
+            //        }
+            //    }
+            //}
         }
 
         #region Generation
@@ -131,8 +121,11 @@ namespace COM
             GenerateVoronoiGraph(MapRegions);
 
             //Normal map
-            //MapOctaveOffsets = GenerateMapOctaveOffsets();
+            MapOctaveOffsets = GenerateMapOctaveOffsets(false);
             RandomizeMapRegions(MapRegions, false);
+
+            //Subtractive map
+            SubMapOctaveOffsets = GenerateMapOctaveOffsets(true);
             RandomizeMapRegions(MapRegions, true);
 
             //GPU
@@ -235,9 +228,6 @@ namespace COM
 
         public ComputeBuffer ShaderGenerateNoiseChunk(int chunkCoordX, int chunkCoordY, int chunkCoordZ)
         {
-            SurfaceOctaveOffsets = GenerateMapOctaveOffsets(false);
-            CaveOctaveOffsets = GenerateMapOctaveOffsets(true);
-
             //Total number of cubes inside a chunk
             int cubesPerChunk = CubesPerAxis * CubesPerAxis * CubesPerAxis;
 
@@ -246,12 +236,12 @@ namespace COM
 
             //Find bytes
             int sizeOfVector4;
-            int sizeOfVector3;
+            int sizeOfVector2;
             int sizeOfMapRegionGPUs;
             unsafe
             {
                 sizeOfVector4 = sizeof(Vector4);
-                sizeOfVector3 = sizeof(Vector3);
+                sizeOfVector2 = sizeof(Vector2);
                 sizeOfMapRegionGPUs = sizeof(MapRegionGPU);
             }
 
@@ -267,36 +257,31 @@ namespace COM
             WGNoiseShader.SetInts("ChunkCoord", new int[3] { chunkCoordX, chunkCoordY, chunkCoordZ });
             WGNoiseShader.SetFloat("ChunkSize", ChunkSize);
             WGNoiseShader.SetFloat("IsoSurface", IsoSurface);
-            WGNoiseShader.SetFloat("CaveThreshold", CaveThreshold);
             WGNoiseShader.SetFloat("CubesPerAxis", CubesPerAxis);
-            WGNoiseShader.SetFloat("SurfaceScale", SurfaceScale);
-            WGNoiseShader.SetFloat("SurfacePersistance", SurfacePersistance);
-            WGNoiseShader.SetFloat("SurfaceLacunarity", SurfaceLacunarity);
-            WGNoiseShader.SetInt("SurfaceOctaves", SurfaceOctaves);
+            WGNoiseShader.SetFloat("MapScale", MapScale);
+            WGNoiseShader.SetFloat("MapPersistance", MapPersistance);
+            WGNoiseShader.SetFloat("MapLacunarity", MapLacunarity);
+            WGNoiseShader.SetInt("Octaves", MapOctaves);
             WGNoiseShader.SetInt("Sites", MapRegionGPUs.Length);
-            WGNoiseShader.SetFloat("TerrainHeight", SurfaceHeight);
-            WGNoiseShader.SetFloat("TerrainFloor", SurfaceFloor);
-            WGNoiseShader.SetFloat("CaveScale", CaveScale);
-            WGNoiseShader.SetFloat("CavePersistance", CavePersistance);
-            WGNoiseShader.SetFloat("CaveLacunarity", CaveLacunarity);
-            WGNoiseShader.SetInt("CaveOctaves", CaveOctaves);
+            WGNoiseShader.SetFloat("TerrainHeight", TerrainHeight);
 
             //StructuredBuffer sets
-            ComputeBuffer surfaceOctaveOffsetsBuffer = new ComputeBuffer(SurfaceOctaves, sizeOfVector3);
-            ComputeBuffer CaveOctaveOffsetsBuffer = new ComputeBuffer(CaveOctaves, sizeOfVector3);
+            ComputeBuffer mapOctaveOffsetsBuffer = new ComputeBuffer(MapOctaves, sizeOfVector2);
+            ComputeBuffer mapSubOctaveOffsetsBuffer = new ComputeBuffer(MapOctaves, sizeOfVector2);
             ComputeBuffer mapRegionGPUsBuffer = new ComputeBuffer(MapRegionGPUs.Length, sizeOfMapRegionGPUs);
-            surfaceOctaveOffsetsBuffer.SetData(SurfaceOctaveOffsets);
-            CaveOctaveOffsetsBuffer.SetData(CaveOctaveOffsets);
+            mapOctaveOffsetsBuffer.SetData(MapOctaveOffsets);
+            mapSubOctaveOffsetsBuffer.SetData(SubMapOctaveOffsets);
             mapRegionGPUsBuffer.SetData(MapRegionGPUs);
-            WGNoiseShader.SetBuffer(kernel, "SurfaceOctaveOffsets", surfaceOctaveOffsetsBuffer);
-            WGNoiseShader.SetBuffer(kernel, "CaveOctaveOffsets", CaveOctaveOffsetsBuffer);
+            WGNoiseShader.SetBuffer(kernel, "MapOctaveOffsets", mapOctaveOffsetsBuffer);
+            WGNoiseShader.SetBuffer(kernel, "SubMapOctaveOffsets", mapSubOctaveOffsetsBuffer);
             WGNoiseShader.SetBuffer(kernel, "MapRegions", mapRegionGPUsBuffer);
 
             //Run kernal
             WGNoiseShader.Dispatch(kernel, processPerThread, processPerThread, processPerThread);
 
             //Get rid of buffer data
-            surfaceOctaveOffsetsBuffer.Dispose();
+            mapOctaveOffsetsBuffer.Dispose();
+            mapSubOctaveOffsetsBuffer.Dispose();
             mapRegionGPUsBuffer.Dispose();
 
             return noisePointsBuffer;
@@ -357,16 +342,15 @@ namespace COM
             return points;
         }
 
-        public Vector3[] GenerateMapOctaveOffsets(bool IsSubtractive)
+        public Vector2[] GenerateMapOctaveOffsets(bool IsSubtractive)
         {
             Random.InitState(IsSubtractive ? -MapSeed.GetHashCode() : MapSeed.GetHashCode());
-            Vector3[] mapOctaveOffsets = new Vector3[SurfaceOctaves];
-            for (int i = 0; i < SurfaceOctaves; i++)
+            Vector2[] mapOctaveOffsets = new Vector2[MapOctaves];
+            for (int i = 0; i < MapOctaves; i++)
             {
                 float offsetX = Random.Range(-100000.0f, 100000.0f) + MapOffset.x;
                 float offsetY = Random.Range(-100000.0f, 100000.0f) + MapOffset.y;
-                float offsetZ = Random.Range(-100000.0f, 100000.0f) + MapOffset.z;
-                mapOctaveOffsets[i] = new Vector3(offsetX, offsetY, offsetZ);
+                mapOctaveOffsets[i] = new Vector2(offsetX, offsetY);
             }
             return mapOctaveOffsets;
         }
@@ -426,6 +410,21 @@ namespace COM
                 mapRegionGPUs[i] = mapRegionGPU;
             }
             return mapRegionGPUs;
+        }
+
+        public KeyFrameGPU[] CreateMapRegionGPUs(Keyframe[] keyframes)
+        {
+            KeyFrameGPU[] keyFrameGPUs = new KeyFrameGPU[keyframes.Length];
+            for (int i = 0; i < keyframes.Length; i++)
+            {
+                KeyFrameGPU keyFrameGPU = new KeyFrameGPU
+                {
+                    FrameTime = keyframes[i].time,
+                    FrameValue = keyframes[i].value
+                };
+                keyFrameGPUs[i] = keyFrameGPU;
+            }
+            return keyFrameGPUs;
         }
         #endregion
     }
