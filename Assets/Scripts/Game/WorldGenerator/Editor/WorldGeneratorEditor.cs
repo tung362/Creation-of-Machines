@@ -11,18 +11,20 @@ namespace COM
         //targeted script data
         private WorldGenerator TargetedScript;
 
+        //Settings
+        public static Vector2Int PreviewSize = new Vector2Int(152, 152);
+
         //Texture data
         private Texture2D PreviewVoronoiGrayscaleTexture;
         private Texture2D PreviewRegionMatchTexture;
 
         //Voronoi data
-        private List<MapRegion> MapRegions = new List<MapRegion>();
-        private MapRegionGPU[] MapRegionGPUs;
+        private List<Region> Regions = new List<Region>();
+        private RegionGPU[] RegionGPUs;
 
         //Chunk generation data
         private int CurrentChunkX = 0;
         private int CurrentChunkY = 0;
-        private Vector3[] MapOctaveOffsets;
 
         void OnEnable()
         {
@@ -34,12 +36,11 @@ namespace COM
         {
             EditorGUILayout.LabelField("Map Size: " + TargetedScript.MapSize.x + "x" + TargetedScript.MapSize.y);
             EditorGUILayout.LabelField("Number of Chunks: " + Mathf.CeilToInt((TargetedScript.MapSize.x / TargetedScript.ChunkSize) * (TargetedScript.MapSize.y / TargetedScript.ChunkSize)));
+
             EditorGUI.BeginChangeCheck();
             DrawDefaultInspector();
-            if (EditorGUI.EndChangeCheck())
-            {
-                GeneratePreviewMap();
-            }
+            PreviewSize = EditorGUILayout.Vector2IntField("Preview Size", PreviewSize);
+            if (EditorGUI.EndChangeCheck()) GeneratePreviewMap();
 
             if (Event.current.type != EventType.ExecuteCommand)
             {
@@ -48,11 +49,11 @@ namespace COM
             }
 
             //Creates 1 chunk every frame to reduce lag
-            if (CurrentChunkX < Mathf.CeilToInt(TargetedScript.MapSize.x / 8.0f))
+            if (CurrentChunkX < Mathf.CeilToInt(PreviewSize.x / 8.0f))
             {
                 GeneratePreviewMapChunk(CurrentChunkX, CurrentChunkY);
                 CurrentChunkY++;
-                if (CurrentChunkY >= Mathf.CeilToInt(TargetedScript.MapSize.y / 8.0f))
+                if (CurrentChunkY >= Mathf.CeilToInt(PreviewSize.y / 8.0f))
                 {
                     CurrentChunkY = 0;
                     CurrentChunkX++;
@@ -67,21 +68,17 @@ namespace COM
             CurrentChunkY = 0;
 
             //Voronoi map
-            TargetedScript.GenerateVoronoiGraph(MapRegions);
+            TargetedScript.GenerateVoronoiGraph(PreviewSize, Regions);
 
             //Normal map
-            MapOctaveOffsets = TargetedScript.GenerateMapOctaveOffsets(false);
-            TargetedScript.RandomizeMapRegions(MapRegions, false);
-
-            //Subtractive map
-            TargetedScript.RandomizeMapRegions(MapRegions, true);
+            TargetedScript.RandomizeMapRegions(Regions);
 
             //GPU
-            MapRegionGPUs = TargetedScript.CreateMapRegionGPUs(MapRegions);
+            RegionGPUs = TargetedScript.CreateRegionGPUs(Regions);
 
             //Create texture
-            PreviewVoronoiGrayscaleTexture = new Texture2D(TargetedScript.MapSize.x, TargetedScript.MapSize.y);
-            PreviewRegionMatchTexture = new Texture2D(TargetedScript.MapSize.x, TargetedScript.MapSize.y);
+            PreviewVoronoiGrayscaleTexture = new Texture2D(PreviewSize.x, PreviewSize.y);
+            PreviewRegionMatchTexture = new Texture2D(PreviewSize.x, PreviewSize.y);
 
             PreviewVoronoiGrayscaleTexture.wrapMode = TextureWrapMode.Clamp;
             PreviewVoronoiGrayscaleTexture.filterMode = FilterMode.Point;
@@ -91,9 +88,9 @@ namespace COM
             PreviewRegionMatchTexture.filterMode = FilterMode.Point;
             PreviewRegionMatchTexture.Apply();
 
-            //for (int x = 0; x < Mathf.CeilToInt(TargetedScript.MapSize.x / 8.0f); x++)
+            //for (int x = 0; x < Mathf.CeilToInt(PreviewSize.x / 8.0f); x++)
             //{
-            //    for (int y = 0; y < Mathf.CeilToInt(TargetedScript.MapSize.y / 8.0f); y++)
+            //    for (int y = 0; y < Mathf.CeilToInt(PreviewSize.y / 8.0f); y++)
             //    {
             //        GeneratePreviewMapChunk(x, y);
             //    }
@@ -113,30 +110,22 @@ namespace COM
 
         void GeneratePreviewMapChunk(int ChunkCoordX, int ChunkCoordY)
         {
-            WGEditorOutputGPU[] normHeights = GenerateNoise(ChunkCoordX, ChunkCoordY, MapOctaveOffsets, MapRegionGPUs);
+            WGEditorOutputGPU[] normHeights = GenerateNoise(ChunkCoordX, ChunkCoordY, RegionGPUs);
 
             for (int i = 0; i < normHeights.Length; i++)
             {
                 //Complete map
                 Color caveColor = Color.red;
-                float completeHeight = normHeights[i].combinedHeight;
 
-                //If cave(subtractive) height is higher than surface(normal) height then it should punch a hole through the preview map
-                if (completeHeight <= normHeights[i].subCombinedHeight)
-                {
-                    completeHeight = 1;
-                    caveColor = Color.green;
-                }
-
-                PreviewVoronoiGrayscaleTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.black, Color.white, normHeights[i].voronoiHeight));
-                PreviewRegionMatchTexture.SetPixel(normHeights[i].coord.x, normHeights[i].coord.y, Color.Lerp(Color.black, Color.white, normHeights[i].voronoiMatchHeight));
+                PreviewVoronoiGrayscaleTexture.SetPixel(normHeights[i].Coord.x, normHeights[i].Coord.y, Color.Lerp(Color.black, Color.white, normHeights[i].VoronoiHeight));
+                PreviewRegionMatchTexture.SetPixel(normHeights[i].Coord.x, normHeights[i].Coord.y, Color.Lerp(Color.black, Color.white, normHeights[i].VoronoiMatchHeight));
             }
 
             PreviewVoronoiGrayscaleTexture.Apply();
             PreviewRegionMatchTexture.Apply();
         }
 
-        public WGEditorOutputGPU[] GenerateNoise(int ChunkCoordX, int ChunkCoordY, Vector3[] mapOctaveOffsets, MapRegionGPU[] mapRegionGPUs)
+        public WGEditorOutputGPU[] GenerateNoise(int ChunkCoordX, int ChunkCoordY, RegionGPU[] mapRegionGPUs)
         {
             //Run through a chunk of 8x8x8 grid tiles
             int threadNum = 8;
@@ -146,13 +135,11 @@ namespace COM
 
             //Find bytes
             int sizeOfPixelOutputs;
-            int sizeOfMapOctaveOffsets;
             int sizeOfMapRegionGPUs;
             unsafe
             {
                 sizeOfPixelOutputs = sizeof(WGEditorOutputGPU);
-                sizeOfMapOctaveOffsets = sizeof(Vector3);
-                sizeOfMapRegionGPUs = sizeof(MapRegionGPU);
+                sizeOfMapRegionGPUs = sizeof(RegionGPU);
             }
 
             //Kernal
@@ -166,18 +153,11 @@ namespace COM
             //Sets
             TargetedScript.WGEditorShader.SetInts("ThreadDimensions", new int[3] { threadNum, threadNum, 1 });
             TargetedScript.WGEditorShader.SetInts("ChunkCoord", new int[3] { ChunkCoordX, ChunkCoordY, 1 });
-            TargetedScript.WGEditorShader.SetFloat("MapScale", TargetedScript.SurfaceScale);
-            TargetedScript.WGEditorShader.SetFloat("MapPersistance", TargetedScript.SurfacePersistance);
-            TargetedScript.WGEditorShader.SetFloat("MapLacunarity", TargetedScript.SurfaceLacunarity);
-            TargetedScript.WGEditorShader.SetInt("Octaves", TargetedScript.SurfaceOctaves);
             TargetedScript.WGEditorShader.SetInt("Sites", mapRegionGPUs.Length);
 
             //StructuredBuffer sets
-            ComputeBuffer mapOctaveOffsetsBuffer = new ComputeBuffer(mapOctaveOffsets.Length, sizeOfMapOctaveOffsets);
             ComputeBuffer mapRegionGPUsBuffer = new ComputeBuffer(mapRegionGPUs.Length, sizeOfMapRegionGPUs);
-            mapOctaveOffsetsBuffer.SetData(mapOctaveOffsets);
             mapRegionGPUsBuffer.SetData(mapRegionGPUs);
-            TargetedScript.WGEditorShader.SetBuffer(kernel, "MapOctaveOffsets", mapOctaveOffsetsBuffer);
             TargetedScript.WGEditorShader.SetBuffer(kernel, "MapRegions", mapRegionGPUsBuffer);
 
             //Run kernal
@@ -188,7 +168,6 @@ namespace COM
 
             //Get rid of buffer data
             heightBuffer.Dispose();
-            mapOctaveOffsetsBuffer.Dispose();
             mapRegionGPUsBuffer.Dispose();
 
             return heightOutputs;

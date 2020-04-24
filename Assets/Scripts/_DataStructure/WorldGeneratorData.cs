@@ -10,72 +10,151 @@ using System;
 
 namespace COM
 {
-    public enum MapGradientMaskType { None, Circle, Square }
+    /*Editor*/
+    public struct WGEditorOutputGPU
+    {
+        public Vector2Int Coord;
+        public float VoronoiHeight;
+        public float VoronoiMatchHeight;
+    };
+
+    /*General*/
     public enum VoronoiGradientMaskType { None, Circle }
-    public enum VoronoiBiomeMaskType { None, Radial, ThickBorders, ThinBorders };
 
     [System.Serializable]
-    public struct GenerationThreshold
+    public class RegionSurfaceBiome
     {
-        public AnimationCurve _LayerThreshold;
-        public AnimationCurve LayerThreshold
-        {
-            get { return _LayerThreshold; }
-            set
-            {
-                _LayerThreshold = value;
-                MaxLayerHeight = 0;
-
-                for (int i = 0; i < LayerThreshold.length; i++)
-                {
-                    if (MaxLayerHeight < LayerThreshold[i].value) MaxLayerHeight = (int)LayerThreshold[i].value;
-                }
-            }
-        }
-
-        [ReadOnly]
-        public int MaxLayerHeight;
+        //Id
+        public string Name;
+        public int Id;
+        //Color
+        public Gradient GroundPalette;
+        public Gradient WallPalette;
+        //General
+        public float Persistance;
+        //Surface layer
+        public float SurfaceHeight;
+        public float SurfaceFloor;
+        //Additive layer
+        public float SurfaceAdditiveHeight;
+        public float SurfaceAdditiveHeightLimit;
+        public float SurfaceAdditiveOffset;
+        //Subtractive
     }
 
     [System.Serializable]
-    public class MapRegion
+    public class RegionCaveBiome
+    {
+        //Id
+        public string Name;
+        public int Id;
+        //Color
+        public Gradient GroundPalette;
+        public Gradient WallPalette;
+        //General
+        public float Persistance;
+        //Cave layer
+        public float CaveThreshold;
+        //Additive
+        //Subtractive
+    }
+
+    [System.Serializable]
+    public class Region
     {
         public string RegionName;
         public int FactionID;
-        public int RegionType;
-        public int CaveRegionType;
         public Site RegionSite;
-
-        public float GenerationModifier;
-        public float GenerationCaveModifier;
+        public RegionSurfaceBiome SurfaceBiome;
+        public RegionCaveBiome CaveBiome;
     }
 
-    public struct MapRegionGPU
+    /*Compute GPU*/
+    [System.Serializable]
+    public struct SurfaceBiomeGPU
     {
-        public int RegionType;
-        public int CaveRegionType;
+        //Id
+        public int Id;
+        //General
+        public float Persistance;
+        //Surface layer
+        public float SurfaceHeight;
+        public float SurfaceFloor;
+        //Additive layer
+        public float SurfaceAdditiveHeight;
+        public float SurfaceAdditiveHeightLimit;
+        public float SurfaceAdditiveOffset;
+        //Subtractive
+    };
+
+    [System.Serializable]
+    public struct CaveBiomeGPU
+    {
+        //Id
+        public int Id;
+        //General
+        public float Persistance;
+        //Cave layer
+        public float CaveThreshold;
+        //Additive
+        //Subtractive
+    };
+
+    public struct RegionGPU
+    {
         public Vector2 Coord;
-
-        public float GenerationModifier;
-        public float GenerationCaveModifier;
+        public SurfaceBiomeGPU SurfaceBiome;
+        public CaveBiomeGPU CaveBiome;
     };
 
-    public struct WGEditorOutputGPU
-    {
-        public Vector2Int coord;
-        public float voronoiHeight;
-        public float normHeight;
-        public float voronoiMatchHeight;
-        public float combinedHeight;
-        public float subHeight;
-        public float subVoronoiMatchHeight;
-        public float subCombinedHeight;
-    };
-
-    struct TriangleGPU
+    public struct TriangleGPU
     {
         public Vector3 vertexA;
         public Vector3 vertexB;
         public Vector3 vertexC;
+    };
+
+    /*Fragment GPU*/
+    public struct RegionIndexFragGPU
+    {
+        public int Index0;
+        public int Index1;
+        public int Index2;
+        public int Index3;
+    };
+
+    public struct GradientFragGPU
+    {
+        public int ColorLength;
+        public Vector4 C0;
+        public Vector4 C1;
+        public Vector4 C2;
+        public Vector4 C3;
+        public Vector4 C4;
+        public Vector4 C5;
+        public Vector4 C6;
+        public Vector4 C7;
+    };
+
+    public struct RegionFragGPU
+    {
+        public Vector2 Coord;
+        public int SurfaceBiomeID;
+        public int CaveBiomeID;
+        //public float SurfaceHeight;
+        //public float SurfaceFloor;
+        //public float SurfaceAdditiveHeightLimit;
+        public GradientFragGPU SurfaceGroundGradient;
+        public GradientFragGPU SurfaceWallGradient;
+        public GradientFragGPU CaveGroundGradient;
+        public GradientFragGPU CaveWallGradient;
+        public int NeighborIndex0;
+        public int NeighborIndex1;
+        public int NeighborIndex2;
+        public int NeighborIndex3;
+        public int NeighborIndex4;
+        public int NeighborIndex5;
+        public int NeighborIndex6;
+        public int NeighborIndex7;
     };
 }

@@ -8,6 +8,10 @@ namespace COM
     {
         public static Run instance { get; private set; }
 
+        /*Generation*/
+        public List<RegionSurfaceBiome> SurfaceBiomes = new List<RegionSurfaceBiome>();
+        public List<RegionCaveBiome> CaveBiomes = new List<RegionCaveBiome>();
+
         //HouseDecorations (tables, lights, chests, etc)
         //Terrain tiles
         //Terrain objects (rocks and plants)

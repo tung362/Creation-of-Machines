@@ -1,0 +1,30 @@
+﻿struct KeyFrameGPU
+{
+    float FrameTime;
+    float FrameValue;
+};
+
+float Evaluate(float value, StructuredBuffer<KeyFrameGPU> keyframes, int keyframesCount)
+{
+	//If empty
+	if (keyframesCount == 0) return 0;
+
+	//If only one outcome exists
+    if (keyframesCount == 1) return keyframes[0].FrameValue;
+
+	//If below minimum
+    if (value <= keyframes[0].FrameTime) return keyframes[0].FrameValue;
+
+	//If above maximum
+    if (value >= keyframes[keyframesCount - 1].FrameTime) return keyframes[keyframesCount - 1].FrameValue;
+
+    for (int i = 0; i < keyframesCount; i++)
+    {
+        int nextIndex = i + 1;
+        if (nextIndex < keyframesCount)
+        {
+            if (value >= keyframes[i].FrameTime && value < keyframes[nextIndex].FrameTime) return keyframes[i].FrameValue;
+        }
+    }
+    return 0;
+}

@@ -1,10 +1,4 @@
-﻿struct KeyFrameGPU
-{
-    float FrameTime;
-    float FrameValue;
-};
-
-int3 ThreadDimensions;
+﻿int3 ThreadDimensions;
 
 int IndexByCoord(int x, int y, int z)
 {
@@ -25,27 +19,12 @@ int3 CoordByIndex(int idx)
     return int3(x, y, z);
 }
 
-float Evaluate(float value, StructuredBuffer<KeyFrameGPU> keyframes, int keyframesCount)
+float InverseLerp(float A, float B, float T)
 {
-	//If empty
-	if (keyframesCount == 0) return 0;
+    return (T - A) / (B - A);
+}
 
-	//If only one outcome exists
-    if (keyframesCount == 1) return keyframes[0].FrameValue;
-
-	//If below minimum
-    if (value <= keyframes[0].FrameTime) return keyframes[0].FrameValue;
-
-	//If above maximum
-    if (value >= keyframes[keyframesCount - 1].FrameTime) return keyframes[keyframesCount - 1].FrameValue;
-
-    for (int i = 0; i < keyframesCount; i++)
-    {
-        int nextIndex = i + 1;
-        if (nextIndex < keyframesCount)
-        {
-            if (value >= keyframes[i].FrameTime && value < keyframes[nextIndex].FrameTime) return keyframes[i].FrameValue;
-        }
-    }
-    return 0;
+float3 InverseLerp(float3 A, float3 B, float3 T)
+{
+    return (T - A) / (B - A);
 }

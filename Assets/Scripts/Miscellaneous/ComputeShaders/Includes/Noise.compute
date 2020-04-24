@@ -1,18 +1,39 @@
 ﻿#include "/SimpleNoise.compute"
 
-struct MapRegionGPU
+struct SurfaceBiomeGPU
 {
-    int RegionType;
-    int CaveRegionType;
-    float2 Coord;
-
-    float GenerationModifier;
-    float GenerationCaveModifier;
+    //Id
+    int Id;
+    //General
+    float Persistance;
+    //Surface layer
+    float SurfaceHeight;
+    float SurfaceFloor;
+    //Additive layer
+    float SurfaceAdditiveHeight;
+    float SurfaceAdditiveHeightLimit;
+    float SurfaceAdditiveOffset;
+    //Subtractive
 };
 
-/*Voronoi data*/
-int Sites;
-StructuredBuffer<MapRegionGPU> MapRegions;
+struct CaveBiomeGPU
+{
+    //Id
+    int Id;
+    //General
+    float Persistance;
+    //Cave layer
+    float CaveThreshold;
+    //Additive
+    //Subtractive
+};
+
+struct RegionGPU
+{
+    float2 Coord;
+    SurfaceBiomeGPU SurfaceBiome;
+    CaveBiomeGPU CaveBiome;
+};
 
 float Perlin(float x, float y, float z, float scale, float presistance, float lacunarity, int octaves, StructuredBuffer<float3> mapOctaveOffsets)
 {
@@ -38,7 +59,7 @@ float Perlin(float x, float y, float z, float scale, float presistance, float la
     return total;
 }
 
-float Voronoi(float x, float y, out int outputRegionIndexes[3])
+float Voronoi(float x, float y, int sites, StructuredBuffer<RegionGPU> mapRegions, out int outputRegionIndexes[3])
 {
 	//Get the 3 closest sites, brute-force method, need to create kdtrees
     float closestDistance = 999999;
@@ -47,9 +68,9 @@ float Voronoi(float x, float y, out int outputRegionIndexes[3])
     float2 closestSiteCoord;
     float2 secondClosestSiteCoord;
     float2 thirdClosestSiteCoord;
-    for (int i = 0; i < Sites; i++)
+    for (int i = 0; i < sites; i++)
     {
-        float dist = distance(MapRegions[i].Coord, float2(x, y));
+        float dist = distance(mapRegions[i].Coord, float2(x, y));
 
         if (dist < closestDistance)
         {
@@ -62,7 +83,7 @@ float Voronoi(float x, float y, out int outputRegionIndexes[3])
             outputRegionIndexes[1] = outputRegionIndexes[0];
 
             closestDistance = dist;
-            closestSiteCoord = MapRegions[i].Coord;
+            closestSiteCoord = mapRegions[i].Coord;
             outputRegionIndexes[0] = i;
 
         }
@@ -74,60 +95,17 @@ float Voronoi(float x, float y, out int outputRegionIndexes[3])
             outputRegionIndexes[2] = outputRegionIndexes[1];
 
             secondClosestDistance = dist;
-            secondClosestSiteCoord = MapRegions[i].Coord;
+            secondClosestSiteCoord = mapRegions[i].Coord;
             outputRegionIndexes[1] = i;
         }
 
         if (dist < thirdClosestDistance && dist > secondClosestDistance)
         {
             thirdClosestDistance = dist;
-            thirdClosestSiteCoord = MapRegions[i].Coord;
+            thirdClosestSiteCoord = mapRegions[i].Coord;
             outputRegionIndexes[2] = i;
         }
     }
 
     return 1 - (closestDistance / secondClosestDistance);
-}
-
-float BlendDistance(float2 coord, int closestIndex, int closestKIndex)
-{
-    float closestDistance = distance(MapRegions[closestIndex].Coord, coord);
-    float closestKDistance = distance(MapRegions[closestKIndex].Coord, coord);
-    return 1 - (closestDistance / closestKDistance);
-}
-
-float BiomeBlend(float baseHeight, float voronoiBaseHeight, float2 coord, int regionIndexes[3])
-{
-    float result = baseHeight * lerp(1, MapRegions[regionIndexes[0]].GenerationModifier, voronoiBaseHeight);
-
-    //If the closest region's type is the same as the second closest region's type
-    if (MapRegions[regionIndexes[0]].RegionType == MapRegions[regionIndexes[1]].RegionType)
-    {
-        result = baseHeight * MapRegions[regionIndexes[0]].GenerationModifier;
-
-        //If the closest region's type is not the same as the third closest region's type
-        if (MapRegions[regionIndexes[0]].RegionType != MapRegions[regionIndexes[2]].RegionType)
-        {
-            result = baseHeight * lerp(1, MapRegions[regionIndexes[0]].GenerationModifier, BlendDistance(coord, regionIndexes[0], regionIndexes[2]));
-        }
-    }
-    return result;
-}
-
-float BiomeBlendView(float baseHeight, float voronoiBaseHeight, float2 coord, int regionIndexes[3], bool fullBlendView)
-{
-	float blendView = voronoiBaseHeight;
-    //If the closest region's type is the same as the second closest region's type
-    if (MapRegions[regionIndexes[0]].RegionType == MapRegions[regionIndexes[1]].RegionType)
-    {
-        blendView = 1;
-
-        //If the closest region's type is not the same as the third closest region's type
-        if (MapRegions[regionIndexes[0]].RegionType != MapRegions[regionIndexes[2]].RegionType)
-        {
-            if (fullBlendView) blendView = BlendDistance(coord, regionIndexes[0], regionIndexes[2]);
-			else blendView = 0;
-        }
-    }
-    return blendView;
 }

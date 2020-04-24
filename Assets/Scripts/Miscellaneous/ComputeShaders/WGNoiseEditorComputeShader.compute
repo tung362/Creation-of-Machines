@@ -4,18 +4,17 @@
 
 struct WGEditorOutputGPU
 {
-    int2 coord;
-    float voronoiHeight;
-    float normHeight;
-    float voronoiMatchHeight;
-    float combinedHeight;
-    float subHeight;
-    float subVoronoiMatchHeight;
-    float subCombinedHeight;
+    int2 Coord;
+    float VoronoiHeight;
+    float VoronoiMatchHeight;
 };
 
 /*Output*/
 RWStructuredBuffer<WGEditorOutputGPU> Heights;
+
+//Voronoi data
+int Sites;
+StructuredBuffer<RegionGPU> MapRegions;
 
 /*Shared data*/
 int3 ChunkCoord;
@@ -33,25 +32,13 @@ void NoiseEditor(uint3 id : SV_DispatchThreadID)
 
 	//Voronoi map
     int regionIndexes[3];
-    float voronoiHeight = Voronoi(chunkCoordX, chunkCoordY, regionIndexes);
+    float voronoiHeight = Voronoi(chunkCoordX, chunkCoordY, Sites, MapRegions, regionIndexes);
 	
 	//Normal map
-    float normHeight = Perlin(chunkCoordX, chunkCoordY, MapOctaveOffsets);
-    float voronoiMatchHeight = BiomeBlendView(normHeight, voronoiHeight, float2(chunkCoordX, chunkCoordY), regionIndexes, false, false);
-    float combinedHeight = BiomeBlend(normHeight, voronoiHeight, float2(chunkCoordX, chunkCoordY), regionIndexes, false);
+    float voronoiMatchHeight = BiomeBlendView(voronoiHeight, float2(chunkCoordX, chunkCoordY), MapRegions, regionIndexes, false);
 
-	//Subtractive map
-    //float subHeight = Perlin(chunkCoordX, chunkCoordY, SubMapOctaveOffsets);
-    //float subVoronoiMatchHeight = BiomeBlendSubtrativeView(subHeight, voronoiHeight, float2(chunkCoordX, chunkCoordY), regionIndexes, true, false);
-    //float subCombinedHeight = BiomeBlendSubtrative(subHeight, voronoiHeight, float2(chunkCoordX, chunkCoordY), regionIndexes, true);
-
-    Heights[index].coord.x = chunkCoordX;
-    Heights[index].coord.y = chunkCoordY;
-    Heights[index].voronoiHeight = voronoiHeight;
-    Heights[index].normHeight = normHeight;
-    Heights[index].voronoiMatchHeight = voronoiMatchHeight;
-    Heights[index].combinedHeight = combinedHeight;
-    //Heights[index].subHeight = subHeight;
-    //Heights[index].subVoronoiMatchHeight = subVoronoiMatchHeight;
-    //Heights[index].subCombinedHeight = subCombinedHeight;
+    Heights[index].Coord.x = chunkCoordX;
+    Heights[index].Coord.y = chunkCoordY;
+    Heights[index].VoronoiHeight = voronoiHeight;
+    Heights[index].VoronoiMatchHeight = voronoiMatchHeight;
 }

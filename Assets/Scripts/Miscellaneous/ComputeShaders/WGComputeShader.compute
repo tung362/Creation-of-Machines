@@ -17,10 +17,8 @@ RWStructuredBuffer<float4> NoisePoints;
 float IsoSurface;
 float CubesPerAxis;
 
-float3 interpolateVerts(float4 vertex1, float4 vertex2)
+float3 VertLerp(float4 vertex1, float4 vertex2)
 {
-    //float t = (IsoSurface - vertex1.w) / (vertex2.w - vertex1.w);
-    //return vertex1.xyz + t * (vertex2.xyz - vertex1.xyz);
     return vertex1.xyz + (IsoSurface - vertex1.w) * (vertex2.xyz - vertex1.xyz) / (vertex2.w - vertex1.w);
 }
 
@@ -80,9 +78,9 @@ void GenerateChunk(uint3 id : SV_DispatchThreadID)
         tri.vertexA = (cornerNodes[vertex1NodeA].xyz + cornerNodes[vertex1NodeB].xyz) * 0.5f;
         tri.vertexB = (cornerNodes[vertex2NodeA].xyz + cornerNodes[vertex2NodeB].xyz) * 0.5f;
         tri.vertexC = (cornerNodes[vertex3NodeA].xyz + cornerNodes[vertex3NodeB].xyz) * 0.5f;
-        //tri.vertexA = interpolateVerts(cornerNodes[vertex1NodeA], cornerNodes[vertex1NodeB]);
-        //tri.vertexB = interpolateVerts(cornerNodes[vertex2NodeA], cornerNodes[vertex2NodeB]);
-        //tri.vertexC = interpolateVerts(cornerNodes[vertex3NodeA], cornerNodes[vertex3NodeB]);
+        //tri.vertexA = VertLerp(cornerNodes[vertex1NodeA], cornerNodes[vertex1NodeB]);
+        //tri.vertexB = VertLerp(cornerNodes[vertex2NodeA], cornerNodes[vertex2NodeB]);
+        //tri.vertexC = VertLerp(cornerNodes[vertex3NodeA], cornerNodes[vertex3NodeB]);
         Triangles.Append(tri);
     }
 }

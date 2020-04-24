@@ -100,6 +100,27 @@ namespace COM
             float dot = Vector2.Dot(lPToSPDirection, lineDirection);
             return linePoint + lineDirection * dot;
         }
+
+        public static Color EncodeFloatRGBA(float v)
+        {
+            uint vi = (uint)(v * (256.0f * 256.0f * 256.0f * 256.0f));
+            int ex = (int)(vi / (256 * 256 * 256) % 256);
+            int ey = (int)((vi / (256 * 256)) % 256);
+            int ez = (int)((vi / (256)) % 256);
+            int ew = (int)(vi % 256);
+            Color e = new Color(ex / 255.0f, ey / 255.0f, ez / 255.0f, ew / 255.0f);
+            return e;
+        }
+
+        public static float DecodeFloatRGBA(Color encode)
+        {
+            uint ex = (uint)(encode.r * 255);
+            uint ey = (uint)(encode.g * 255);
+            uint ez = (uint)(encode.b * 255);
+            uint ew = (uint)(encode.a * 255);
+            uint v = (ex << 24) + (ey << 16) + (ez << 8) + ew;
+            return v / (256.0f * 256.0f * 256.0f * 256.0f);
+        }
     }
 
 }
