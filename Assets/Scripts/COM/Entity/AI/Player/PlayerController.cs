@@ -1,14 +1,13 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using COM.Entity;
 
-namespace COM.AI
+namespace COM.Entity.AI
 {
     //Handles player action inputs of entity
     public class PlayerController : MonoBehaviour
     {
-        public EntityBody EntityToControl;
+        public CharacterBody Body;
 
         void Start()
         {

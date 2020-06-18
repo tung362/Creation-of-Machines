@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEditor;
 using UnityEngine.AI;
 
-namespace COM.AI
+namespace COM.Entity.AI
 {
     [CanEditMultipleObjects]
     [CustomEditor(typeof(NavMeshRegionTag))]

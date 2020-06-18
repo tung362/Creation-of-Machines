@@ -24,8 +24,8 @@ namespace COM.Utils.World
 
             nextIndex = index;
             TextureEncoder.EncodeVector2(encode.RegionSite.Coord, dataTexture, nextIndex, out nextIndex);
-            TextureEncoder.EncodeFloat(encode.SurfaceBiome.Id, dataTexture, nextIndex, out nextIndex);
-            TextureEncoder.EncodeFloat(encode.CaveBiome.Id, dataTexture, nextIndex, out nextIndex);
+            TextureEncoder.EncodeFloat(encode.SurfaceBiomeID, dataTexture, nextIndex, out nextIndex);
+            TextureEncoder.EncodeFloat(encode.CaveBiomeID, dataTexture, nextIndex, out nextIndex);
             TextureEncoder.EncodeFloat(0 < neighborSites.Count ? neighborSites[0].SiteIndex : -1, dataTexture, nextIndex, out nextIndex);
             TextureEncoder.EncodeFloat(1 < neighborSites.Count ? neighborSites[1].SiteIndex : -1, dataTexture, nextIndex, out nextIndex);
             TextureEncoder.EncodeFloat(2 < neighborSites.Count ? neighborSites[2].SiteIndex : -1, dataTexture, nextIndex, out nextIndex);

@@ -7,7 +7,7 @@
 static const int GradientSize = 9;
 
 /*Structs*/
-struct GradientFragGPU
+struct FragGradient
 {
     int ColorLength;
     float4 C0;
@@ -27,10 +27,10 @@ int GetGradientIndex(int regionIndex)
 }
 
 /*Load from texture*/
-GradientFragGPU LoadGradient(Texture2D dataTexture, int index, out int nextIndex)
+FragGradient LoadGradient(Texture2D dataTexture, int index, out int nextIndex)
 {
     nextIndex = index;
-    GradientFragGPU retVal;
+    FragGradient retVal;
     retVal.ColorLength = DecodeFloat(dataTexture, nextIndex, nextIndex);
     retVal.C0 = DecodeFloat4(dataTexture, nextIndex, nextIndex);
     retVal.C1 = DecodeFloat4(dataTexture, nextIndex, nextIndex);
@@ -43,7 +43,7 @@ GradientFragGPU LoadGradient(Texture2D dataTexture, int index, out int nextIndex
     return retVal;
 }
 
-GradientFragGPU LoadGradient(Texture2D dataTexture, int regionIndex)
+FragGradient LoadGradient(Texture2D dataTexture, int regionIndex)
 {
     int index = GetGradientIndex(regionIndex);
     return LoadGradient(dataTexture, index, index);
@@ -51,23 +51,23 @@ GradientFragGPU LoadGradient(Texture2D dataTexture, int regionIndex)
 
 
 /*Logic*/
-GradientFragGPU Compare(GradientFragGPU gradient0, GradientFragGPU gradient1, float result)
+FragGradient Compare(FragGradient gradient0, FragGradient gradient1, float result)
 {
-    GradientFragGPU gradientFragGPU;
-    gradientFragGPU.ColorLength = lerp(gradient0.ColorLength, gradient1.ColorLength, result);
-    gradientFragGPU.C0 = lerp(gradient0.C0, gradient1.C0, result);
-    gradientFragGPU.C1 = lerp(gradient0.C1, gradient1.C1, result);
-    gradientFragGPU.C2 = lerp(gradient0.C2, gradient1.C2, result);
-    gradientFragGPU.C3 = lerp(gradient0.C3, gradient1.C3, result);
-    gradientFragGPU.C4 = lerp(gradient0.C4, gradient1.C4, result);
-    gradientFragGPU.C5 = lerp(gradient0.C5, gradient1.C5, result);
-    gradientFragGPU.C6 = lerp(gradient0.C6, gradient1.C6, result);
-    gradientFragGPU.C7 = lerp(gradient0.C7, gradient1.C7, result);
-    return gradientFragGPU;
+    FragGradient fragGradient;
+    fragGradient.ColorLength = lerp(gradient0.ColorLength, gradient1.ColorLength, result);
+    fragGradient.C0 = lerp(gradient0.C0, gradient1.C0, result);
+    fragGradient.C1 = lerp(gradient0.C1, gradient1.C1, result);
+    fragGradient.C2 = lerp(gradient0.C2, gradient1.C2, result);
+    fragGradient.C3 = lerp(gradient0.C3, gradient1.C3, result);
+    fragGradient.C4 = lerp(gradient0.C4, gradient1.C4, result);
+    fragGradient.C5 = lerp(gradient0.C5, gradient1.C5, result);
+    fragGradient.C6 = lerp(gradient0.C6, gradient1.C6, result);
+    fragGradient.C7 = lerp(gradient0.C7, gradient1.C7, result);
+    return fragGradient;
 }
 
 /*Utils*/
-GradientFragGPU BlendGradient(GradientFragGPU gradient0, GradientFragGPU gradient1, float sample)
+FragGradient BlendGradient(FragGradient gradient0, FragGradient gradient1, float sample)
 {
     float4 C0Mid = (gradient0.C0 + gradient1.C0) * 0.5f;
     float4 C1Mid = (gradient0.C1 + gradient1.C1) * 0.5f;
@@ -77,7 +77,7 @@ GradientFragGPU BlendGradient(GradientFragGPU gradient0, GradientFragGPU gradien
     float4 C5Mid = (gradient0.C5 + gradient1.C5) * 0.5f;
     float4 C6Mid = (gradient0.C6 + gradient1.C6) * 0.5f;
     float4 C7Mid = (gradient0.C7 + gradient1.C7) * 0.5f;
-    GradientFragGPU gradient;
+    FragGradient gradient;
     gradient.ColorLength = lerp(gradient0.ColorLength, gradient1.ColorLength, step(gradient0.ColorLength, gradient1.ColorLength));
     gradient.C0 = lerp(C0Mid, gradient1.C0, sample);
     gradient.C1 = lerp(C1Mid, gradient1.C1, sample);

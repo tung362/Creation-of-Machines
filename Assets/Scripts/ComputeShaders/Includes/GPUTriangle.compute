@@ -1,0 +1,11 @@
+﻿#ifndef GPU_Triangle_
+#define GPU_Triangle_
+
+/*Structs*/
+struct GPUTriangle
+{
+    float3 vertexA;
+    float3 vertexB;
+    float3 vertexC;
+};
+#endif

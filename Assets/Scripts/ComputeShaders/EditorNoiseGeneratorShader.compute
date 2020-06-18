@@ -1,0 +1,49 @@
+﻿#ifndef Editor_Noise_Generator_
+#define Editor_Noise_Generator_
+
+#pragma kernel EditorNoiseGenerator
+#include "Includes/Mapper.compute"
+#include "Includes/Terrain.compute"
+#include "Includes/VoronoiNoise.compute"
+
+/*Structs*/
+struct GPUEditorOutput
+{
+    int2 Coord;
+    float VoronoiHeight;
+    float VoronoiMatchHeight;
+};
+
+/*Output*/
+RWStructuredBuffer<GPUEditorOutput> Heights;
+
+/*Inputs*/
+int3 ThreadDimensions;
+int3 ChunkCoord;
+int RegionsCount;
+StructuredBuffer<GPURegion> Regions;
+
+[numthreads(8, 8, 1)]
+void EditorNoiseGenerator(uint3 id : SV_DispatchThreadID)
+{
+    //Local space coord
+    int index = IndexByCoord(id.x, id.y, id.z, ThreadDimensions);
+    int3 coord = CoordByIndex(index, ThreadDimensions);
+
+	//World space coord
+    int chunkCoordX = (ChunkCoord.x * ThreadDimensions.x) + coord.x;
+    int chunkCoordY = (ChunkCoord.y * ThreadDimensions.y) + coord.y;
+
+	//Voronoi map
+    int regionIndexes[3];
+    float voronoiHeight = Voronoi(chunkCoordX, chunkCoordY, RegionsCount, Regions, regionIndexes);
+	
+	//Normal map
+    float voronoiMatchHeight = BlendView(voronoiHeight, float2(chunkCoordX, chunkCoordY), Regions, regionIndexes, false);
+
+    Heights[index].Coord.x = chunkCoordX;
+    Heights[index].Coord.y = chunkCoordY;
+    Heights[index].VoronoiHeight = voronoiHeight;
+    Heights[index].VoronoiMatchHeight = voronoiMatchHeight;
+}
+#endif

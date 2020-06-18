@@ -1,4 +1,8 @@
-﻿/*Vertice node to corner node lookup*/
+﻿#ifndef Marching_Cubes_
+#define Marching_Cubes_
+
+/*Consts*/
+//vertex node to corner node lookup
 static const int VerticeNodeToCornerNodeIndex[12][2] =
 {
     { 0, 1 }, //0
@@ -15,7 +19,7 @@ static const int VerticeNodeToCornerNodeIndex[12][2] =
     { 3, 7 } //11
 };
 
-/*Marching cube lookup table*/
+//Marching cube lookup table
 //last index of [16] is the loop stopper, always -1
 static const int TriTable[256][16] =
 {
@@ -276,3 +280,4 @@ static const int TriTable[256][16] =
     { 0, 3, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 },
     { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }
 };
+#endif

@@ -6,7 +6,7 @@
 
 void FindClosest3(Texture2D regionMapTexture, float3 worldPosition, int biomeIndex, float closestDistanceIn, float secondClosestDistanceIn, float thirdClosestDistanceIn, int regionIndex0In, int regionIndex1In, int regionIndex2In, out float closestDistanceOut, out float secondClosestDistanceOut, out float thirdClosestDistanceOut, out int regionIndex0Out, out int regionIndex1Out, out int regionIndex2Out)
 {
-    RegionMapFragGPU regionMap = LoadRegionMap(regionMapTexture, biomeIndex);
+    FragRegionMap regionMap = LoadRegionMap(regionMapTexture, biomeIndex);
     
     closestDistanceOut = closestDistanceIn;
     secondClosestDistanceOut = secondClosestDistanceIn;
@@ -65,7 +65,7 @@ void VoronoiNoise_float(Texture2D regionMapTexture, float3 worldPosition, int bi
         //If haven't found third closest then do neighbor search
         if (regionIndex2Out == -1)
         {
-            RegionMapFragGPU regionMap = LoadRegionMap(regionMapTexture, regionIndex0Out);
+            FragRegionMap regionMap = LoadRegionMap(regionMapTexture, regionIndex0Out);
             if(regionMap.NeighborIndex0 != -1) FindClosest3(regionMapTexture, worldPosition, regionMap.NeighborIndex0, closestDistance, secondClosestDistance, thirdClosestDistance, regionIndex0Out, regionIndex1Out, regionIndex2Out, closestDistance, secondClosestDistance, thirdClosestDistance, regionIndex0Out, regionIndex1Out, regionIndex2Out);
             if(regionMap.NeighborIndex1 != -1) FindClosest3(regionMapTexture, worldPosition, regionMap.NeighborIndex1, closestDistance, secondClosestDistance, thirdClosestDistance, regionIndex0Out, regionIndex1Out, regionIndex2Out, closestDistance, secondClosestDistance, thirdClosestDistance, regionIndex0Out, regionIndex1Out, regionIndex2Out);
             if(regionMap.NeighborIndex2 != -1) FindClosest3(regionMapTexture, worldPosition, regionMap.NeighborIndex2, closestDistance, secondClosestDistance, thirdClosestDistance, regionIndex0Out, regionIndex1Out, regionIndex2Out, closestDistance, secondClosestDistance, thirdClosestDistance, regionIndex0Out, regionIndex1Out, regionIndex2Out);
@@ -81,7 +81,7 @@ void VoronoiNoise_float(Texture2D regionMapTexture, float3 worldPosition, int bi
         //Neighbor search
         if (biomeIndex0 != -1)
         {
-            RegionMapFragGPU regionMap = LoadRegionMap(regionMapTexture, biomeIndex0);
+            FragRegionMap regionMap = LoadRegionMap(regionMapTexture, biomeIndex0);
             FindClosest3(regionMapTexture, worldPosition, biomeIndex0, closestDistance, secondClosestDistance, thirdClosestDistance, regionIndex0Out, regionIndex1Out, regionIndex2Out, closestDistance, secondClosestDistance, thirdClosestDistance, regionIndex0Out, regionIndex1Out, regionIndex2Out);
             if(regionMap.NeighborIndex0 != -1) FindClosest3(regionMapTexture, worldPosition, regionMap.NeighborIndex0, closestDistance, secondClosestDistance, thirdClosestDistance, regionIndex0Out, regionIndex1Out, regionIndex2Out, closestDistance, secondClosestDistance, thirdClosestDistance, regionIndex0Out, regionIndex1Out, regionIndex2Out);
             if(regionMap.NeighborIndex1 != -1) FindClosest3(regionMapTexture, worldPosition, regionMap.NeighborIndex1, closestDistance, secondClosestDistance, thirdClosestDistance, regionIndex0Out, regionIndex1Out, regionIndex2Out, closestDistance, secondClosestDistance, thirdClosestDistance, regionIndex0Out, regionIndex1Out, regionIndex2Out);

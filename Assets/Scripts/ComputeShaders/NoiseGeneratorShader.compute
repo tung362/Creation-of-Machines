@@ -1,0 +1,196 @@
+﻿#ifndef Noise_Generator_
+#define Noise_Generator_
+
+#pragma kernel NoiseGenerator
+#include "Includes/Mapper.compute"
+#include "Includes/Math.compute"
+#include "Includes/Terrain.compute"
+#include "Includes/PerlinNoise.compute"
+#include "Includes/VoronoiNoise.compute"
+
+/*Output*/
+RWStructuredBuffer<float4> NoisePoints;
+RWStructuredBuffer<int> RegionIndexes;
+
+/*Inputs*/
+int3 ThreadDimensions;
+float ChunkSize;
+float CubesPerAxis;
+//Surface biome
+int SurfaceOctaves;
+float SurfaceLacunarity;
+float SurfaceScale;
+//Cave biome
+int CaveOctaves;
+float CaveLacunarity;
+float CaveScale;
+//StructuredBuffer Count
+int SurfaceBiomesCount;
+int CaveBiomesCount;
+int RegionsCount;
+//StructuredBuffer
+StructuredBuffer<float3> SurfaceOctaveOffsets;
+StructuredBuffer<float3> CaveOctaveOffsets;
+StructuredBuffer<GPUSurfaceBiome> SurfaceBiomes;
+StructuredBuffer<GPUCaveBiome> CaveBiomes;
+StructuredBuffer<GPURegion> Regions;
+//Chunk info
+int3 ChunkCoord;
+
+float BiomeBlend(float voronoiBaseHeight, float3 coord, StructuredBuffer<GPURegion> regions, int regionIndexes[3])
+{
+    /*Variables*/
+    //Current region biomes
+    GPUSurfaceBiome surfaceBiome = SurfaceBiomes[regions[regionIndexes[0]].SurfaceBiomeID];
+    GPUCaveBiome caveBiome = CaveBiomes[regions[regionIndexes[0]].CaveBiomeID];
+    
+    GPUSurfaceBiome surfaceBiome2 = SurfaceBiomes[regions[regionIndexes[1]].SurfaceBiomeID];
+    GPUCaveBiome caveBiome2 = CaveBiomes[regions[regionIndexes[1]].CaveBiomeID];
+    
+    GPUSurfaceBiome surfaceBiome3 = SurfaceBiomes[regions[regionIndexes[2]].SurfaceBiomeID];
+    GPUCaveBiome caveBiome3 = CaveBiomes[regions[regionIndexes[2]].CaveBiomeID];
+    
+    //Surface variables
+    float surfacePersistance = surfaceBiome.Persistance;
+    float surfaceHeight = surfaceBiome.Height;
+    float surfaceFloor = surfaceBiome.Floor;
+    
+    //Cave variables
+    float cavePersistance = caveBiome.Persistance;
+    float caveThreshold = caveBiome.Threshold;
+    
+    //Surface additive variables
+    float surfaceAdditiveHeight = surfaceBiome.AdditiveHeight;
+    float surfaceAdditiveHeightLimit = surfaceBiome.AdditiveHeightLimit;
+    float surfaceAdditiveOffset = surfaceBiome.AdditiveOffset;
+    
+    /*Biome blend first pass*/
+    //Percentage of biome's outer border used to blend with other biomes
+    if (voronoiBaseHeight <= 0.3f)
+    {
+        float sample = InverseLerp(0, 0.3f, voronoiBaseHeight);
+        
+        //Surface
+        float surfacePersistanceMid = (surfaceBiome2.Persistance + surfaceBiome.Persistance) * 0.5f;
+        float surfaceHeightMid = (surfaceBiome2.Height + surfaceBiome.Height) * 0.5f;
+        float surfaceFloorMid = (surfaceBiome2.Floor + surfaceBiome.Floor) * 0.5f;
+        surfacePersistance = lerp(surfacePersistanceMid, surfaceBiome.Persistance, sample);
+        surfaceHeight = lerp(surfaceHeightMid, surfaceBiome.Height, sample);
+        surfaceFloor = lerp(surfaceFloorMid, surfaceBiome.Floor, sample);
+        
+        //Cave
+        float cavePersistanceMid = (caveBiome2.Persistance + caveBiome.Persistance) * 0.5f;
+        float caveThresholdMid = (caveBiome2.Threshold + caveBiome.Threshold) * 0.5f;
+        cavePersistance = lerp(cavePersistanceMid, caveBiome.Persistance, sample);
+        caveThreshold = lerp(caveThresholdMid, caveBiome.Threshold, sample);
+        
+        //Surface additive
+        float surfaceAdditiveHeightMid = (surfaceBiome2.AdditiveHeight + surfaceBiome.AdditiveHeight) * 0.5f;
+        float surfaceAdditiveHeightLimitMid = (surfaceBiome2.AdditiveHeightLimit + surfaceBiome.AdditiveHeightLimit) * 0.5f;
+        float surfaceAdditiveOffsetMid = (surfaceBiome2.AdditiveOffset + surfaceBiome.AdditiveOffset) * 0.5f;
+        surfaceAdditiveHeight = lerp(surfaceAdditiveHeightMid, surfaceBiome.AdditiveHeight, sample);
+        surfaceAdditiveHeightLimit = lerp(surfaceAdditiveHeightLimitMid, surfaceBiome.AdditiveHeightLimit, sample);
+        surfaceAdditiveOffset = lerp(surfaceAdditiveOffsetMid, surfaceBiome.AdditiveOffset, sample);
+        
+        /*Biome blend second pass*/
+        float secondaryBlendNoise = BlendDistance(float2(coord.x, coord.z), regions[regionIndexes[0]], regions[regionIndexes[2]]);
+        sample = InverseLerp(0, 0.3f, secondaryBlendNoise);
+        
+        if (secondaryBlendNoise <= 0.3f)
+        {
+            //If the closest region's type is the same as the second closest region's type
+            if (regions[regionIndexes[0]].SurfaceBiomeID == regions[regionIndexes[1]].SurfaceBiomeID)
+            {
+                //If the closest region's type is not the same as the third closest region's type
+                if (regions[regionIndexes[0]].SurfaceBiomeID != regions[regionIndexes[2]].SurfaceBiomeID)
+                {
+                    //Surface
+                    surfacePersistanceMid = (surfaceBiome3.Persistance + surfaceBiome.Persistance) * 0.5f;
+                    surfaceHeightMid = (surfaceBiome3.Height + surfaceBiome.Height) * 0.5f;
+                    surfaceFloorMid = (surfaceBiome3.Floor + surfaceBiome.Floor) * 0.5f;
+                    
+                    surfacePersistance = lerp(surfacePersistanceMid, surfaceBiome.Persistance, sample);
+                    surfaceHeight = lerp(surfaceHeightMid, surfaceBiome.Height, sample);
+                    surfaceFloor = lerp(surfaceFloorMid, surfaceBiome.Floor, sample);
+                    
+                    //Surface additive
+                    surfaceAdditiveHeightMid = (surfaceBiome3.AdditiveHeight + surfaceBiome.AdditiveHeight) * 0.5f;
+                    surfaceAdditiveHeightLimitMid = (surfaceBiome3.AdditiveHeightLimit + surfaceBiome.AdditiveHeightLimit) * 0.5f;
+                    surfaceAdditiveOffsetMid = (surfaceBiome3.AdditiveOffset + surfaceBiome.AdditiveOffset) * 0.5f;
+                    
+                    surfaceAdditiveHeight = lerp(surfaceAdditiveHeightMid, surfaceBiome.AdditiveHeight, sample);
+                    surfaceAdditiveHeightLimit = lerp(surfaceAdditiveHeightLimitMid, surfaceBiome.AdditiveHeightLimit, sample);
+                    surfaceAdditiveOffset = lerp(surfaceAdditiveOffsetMid, surfaceBiome.AdditiveOffset, sample);
+                }
+            }
+        
+            //If the closest region's type is the same as the second closest region's type
+            if (regions[regionIndexes[0]].CaveBiomeID == regions[regionIndexes[1]].CaveBiomeID)
+            {
+                //If the closest region's type is not the same as the third closest region's type
+                if (regions[regionIndexes[0]].CaveBiomeID != regions[regionIndexes[2]].CaveBiomeID)
+                {
+                    //Cave
+                    cavePersistanceMid = (caveBiome3.Persistance + caveBiome.Persistance) * 0.5f;
+                    caveThresholdMid = (caveBiome3.Threshold + caveBiome.Threshold) * 0.5f;
+                    
+                    cavePersistance = lerp(cavePersistanceMid, caveBiome.Persistance, sample);
+                    caveThreshold = lerp(caveThresholdMid, caveBiome.Threshold, sample);
+                }
+            }
+        }
+    }
+	
+    /*Final calculations*/
+	//Normal map
+    float normHeight = Perlin(coord.x, coord.y, coord.z, SurfaceScale, surfacePersistance, SurfaceLacunarity, SurfaceOctaves, SurfaceOctaveOffsets);
+
+    //Subtractive map
+    float subHeight = Perlin(coord.x, coord.y, coord.z, CaveScale, cavePersistance, CaveLacunarity, CaveOctaves, CaveOctaveOffsets);
+
+    //Surface
+    float noise = (coord.y - surfaceFloor) + normHeight * surfaceHeight;
+
+    //Surface additive
+    float surfaceAdditive = 0;
+    if (coord.y >= surfaceFloor) surfaceAdditive = (coord.y - (surfaceFloor + surfaceAdditiveOffset)) + normHeight * surfaceAdditiveHeight;
+    if (coord.y >= surfaceAdditiveHeightLimit)
+    {
+        float t = clamp((coord.y - surfaceAdditiveHeightLimit) / 1.0f, 0, 1);
+        surfaceAdditive = lerp(surfaceAdditive, 1.0f, t);
+    }
+    if (coord.y < surfaceFloor) surfaceAdditive = 1;
+    if (noise > surfaceAdditive) noise = noise + surfaceAdditive;
+
+    //Cave
+    if (subHeight >= caveThreshold) noise = 1;
+    
+    return noise;
+}
+
+[numthreads(8, 8, 8)]
+void NoiseGenerator(uint3 id : SV_DispatchThreadID)
+{
+    //Prevents out of bounds, use 1 dimension smaller so chunks don't overlap
+    if (id.x >= CubesPerAxis || id.y >= CubesPerAxis || id.z >= CubesPerAxis) return;
+
+    //How far apart each cube is scaled to the chunk's size
+    float cubesChunkOffset = ChunkSize / (CubesPerAxis - 1);
+
+    //Local space coord
+    int index = IndexByCoord(id.x, id.y, id.z, ThreadDimensions);
+    float3 localCoord = float3(id.x * cubesChunkOffset, id.y * cubesChunkOffset, id.z * cubesChunkOffset);
+
+    //World space
+    float3 worldCoord = float3((ChunkCoord.x * ChunkSize) + (id.x * cubesChunkOffset), (ChunkCoord.y * ChunkSize) + (id.y * cubesChunkOffset), (ChunkCoord.z * ChunkSize) + (id.z * cubesChunkOffset));
+	
+	//Voronoi map
+    int regionIndexes[3];
+    float voronoiHeight = Voronoi(worldCoord.x, worldCoord.z, RegionsCount, Regions, regionIndexes);
+
+    float noise = BiomeBlend(voronoiHeight, worldCoord, Regions, regionIndexes);
+    
+    NoisePoints[index] = float4(localCoord.x, localCoord.y, localCoord.z, noise);
+    RegionIndexes[IndexByCoord(id.x, id.z, 0, int3(CubesPerAxis, CubesPerAxis, 1))] = regionIndexes[0];
+}
+#endif

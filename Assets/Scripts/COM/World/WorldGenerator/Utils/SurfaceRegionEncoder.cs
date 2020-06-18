@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using COM.Database.World;
 using COM.World;
 
 namespace COM.Utils.World
@@ -15,17 +16,17 @@ namespace COM.Utils.World
         public const int EncodeSize = 21;
 
         /*Save to texture*/
-        public static void EncodeSurfaceRegion(RegionSurfaceBiome encode, Texture2D dataTexture, int index, out int nextIndex)
+        public static void EncodeSurfaceRegion(SurfaceBiomeDatabase.SurfaceBiome encode, Texture2D dataTexture, int index, out int nextIndex)
         {
             nextIndex = index;
-            TextureEncoder.EncodeFloat(encode.SurfaceHeight, dataTexture, nextIndex, out nextIndex);
-            TextureEncoder.EncodeFloat(encode.SurfaceFloor, dataTexture, nextIndex, out nextIndex);
-            TextureEncoder.EncodeFloat(encode.SurfaceAdditiveHeightLimit, dataTexture, nextIndex, out nextIndex);
+            TextureEncoder.EncodeFloat(encode.Height, dataTexture, nextIndex, out nextIndex);
+            TextureEncoder.EncodeFloat(encode.Floor, dataTexture, nextIndex, out nextIndex);
+            TextureEncoder.EncodeFloat(encode.AdditiveHeightLimit, dataTexture, nextIndex, out nextIndex);
             GradientEncoder.EncodeGradient(encode.GroundPalette, dataTexture, nextIndex, out nextIndex);
             GradientEncoder.EncodeGradient(encode.WallPalette, dataTexture, nextIndex, out nextIndex);
         }
 
-        public static Texture2D CreateTexture(List<RegionSurfaceBiome> surfaceBiomes)
+        public static Texture2D CreateTexture(SurfaceBiomeDatabase.SurfaceBiomeList surfaceBiomes)
         {
             Texture2D texture = new Texture2D(surfaceBiomes.Count * EncodeSize, 1, TextureFormat.RGBAFloat, false, true);
             int index = 0;

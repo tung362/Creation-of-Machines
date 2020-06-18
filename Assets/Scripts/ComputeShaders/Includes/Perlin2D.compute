@@ -1,4 +1,7 @@
-﻿// Noise Shader Library for Unity - https://github.com/keijiro/NoiseShader
+﻿#ifndef Perlin_2D_
+#define Perlin_2D_
+
+// Noise Shader Library for Unity - https://github.com/keijiro/NoiseShader
 //
 // Original work (webgl-noise) Copyright (C) 2011 Stefan Gustavson
 // Translation and modification was made by Keijiro Takahashi.
@@ -127,3 +130,4 @@ float pnoise(float2 P, float2 rep)
     float n_xy = lerp(n_x.x, n_x.y, fade_xy.y);
     return 2.3 * n_xy;
 }
+#endif

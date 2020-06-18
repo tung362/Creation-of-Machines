@@ -1,0 +1,18 @@
+﻿#ifndef Mapper_
+#define Mapper_
+
+/*Utils*/
+int IndexByCoord(int x, int y, int z, int3 dim)
+{
+    return (z * dim.x * dim.y) + (y * dim.x) + x;
+}
+
+int3 CoordByIndex(int idx, int3 dim)
+{
+    int z = idx / (dim.x * dim.y);
+    idx -= (z * dim.x * dim.y);
+    int y = idx / dim.x;
+    int x = idx % dim.x;
+    return int3(x, y, z);
+}
+#endif

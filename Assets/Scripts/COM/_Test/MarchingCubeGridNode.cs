@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace COM
+namespace COM.Test
 {
     public class MarchingCubeGridNode : MonoBehaviour
     {

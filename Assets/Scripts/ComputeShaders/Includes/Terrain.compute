@@ -1,0 +1,63 @@
+﻿#ifndef Terrain_
+#define Terrain_
+
+/*Structs*/
+struct GPUSurfaceBiome
+{
+    //General
+    float Persistance;
+    //Surface layer
+    float Height;
+    float Floor;
+    //Additive layer
+    float AdditiveHeight;
+    float AdditiveHeightLimit;
+    float AdditiveOffset;
+    //Subtractive
+};
+
+struct GPUCaveBiome
+{
+    //General
+    float Persistance;
+    //Cave layer
+    float Threshold;
+    //Additive
+    //Subtractive
+};
+
+struct GPURegion
+{
+    float2 Coord;
+    int SurfaceBiomeID;
+    int CaveBiomeID;
+};
+
+/*Utils*/
+float BlendDistance(float2 coord, GPURegion closest, GPURegion closestK)
+{
+    float closestDistance = distance(closest.Coord, coord);
+    float closestKDistance = distance(closestK.Coord, coord);
+    return 1 - (closestDistance / closestKDistance);
+}
+
+float BlendView(float voronoiBaseHeight, float2 coord, StructuredBuffer<GPURegion> regions, int regionIndexes[3], bool fullBlendView)
+{
+    float blendView = voronoiBaseHeight;
+    //If the closest region's type is the same as the second closest region's type
+    if (regions[regionIndexes[0]].SurfaceBiomeID == regions[regionIndexes[1]].SurfaceBiomeID)
+    {
+        blendView = 1;
+
+        //If the closest region's type is not the same as the third closest region's type
+        if (regions[regionIndexes[0]].SurfaceBiomeID != regions[regionIndexes[2]].SurfaceBiomeID)
+        {
+            if (fullBlendView)
+                blendView = BlendDistance(coord, regions[regionIndexes[0]], regions[regionIndexes[2]]);
+            else
+                blendView = 0;
+        }
+    }
+    return blendView;
+}
+#endif

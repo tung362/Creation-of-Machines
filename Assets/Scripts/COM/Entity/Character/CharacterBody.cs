@@ -5,7 +5,7 @@ using UnityEngine;
 namespace COM.Entity
 {
     //Handles action inputs of entity
-    public class EntityBody : MonoBehaviour
+    public class CharacterBody : MonoBehaviour
     {
         //To do: Add shared entity behaviors in this script example: attack behaviors, inventory, etc, player/AI can then access through inputs
 
