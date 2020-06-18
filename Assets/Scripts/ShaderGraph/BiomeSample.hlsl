@@ -15,27 +15,27 @@ float BlendDistance(float2 coord, float2 closest, float2 closestK)
 void SeperateBiomeLayers_float(Texture2D surfaceRegionsTexture, Texture2D caveRegionsTexture, Texture2D regionMapTexture, float slope, float3 worldPosition, float noise, int regionIndex0, int regionIndex1, int regionIndex2, out float gradientSampleOut, out Gradient GradientOut)
 {
     //Load data texture
-    RegionMapFragGPU test0 = LoadRegionMap(regionMapTexture, regionIndex0);
-    RegionMapFragGPU test1 = LoadRegionMap(regionMapTexture, regionIndex1);
-    RegionMapFragGPU test2 = LoadRegionMap(regionMapTexture, regionIndex2);
+    FragRegionMap test0 = LoadRegionMap(regionMapTexture, regionIndex0);
+    FragRegionMap test1 = LoadRegionMap(regionMapTexture, regionIndex1);
+    FragRegionMap test2 = LoadRegionMap(regionMapTexture, regionIndex2);
     
-    SurfaceRegionFragGPU surfaceRegion0 = LoadSurfaceRegion(surfaceRegionsTexture, test0.SurfaceBiomeID);
-    SurfaceRegionFragGPU surfaceRegion1 = LoadSurfaceRegion(surfaceRegionsTexture, test1.SurfaceBiomeID);
-    SurfaceRegionFragGPU surfaceRegion2 = LoadSurfaceRegion(surfaceRegionsTexture, test2.SurfaceBiomeID);
+    FragSurfaceRegion surfaceRegion0 = LoadSurfaceRegion(surfaceRegionsTexture, test0.SurfaceBiomeID);
+    FragSurfaceRegion surfaceRegion1 = LoadSurfaceRegion(surfaceRegionsTexture, test1.SurfaceBiomeID);
+    FragSurfaceRegion surfaceRegion2 = LoadSurfaceRegion(surfaceRegionsTexture, test2.SurfaceBiomeID);
     
-    CaveRegionFragGPU caveRegion0 = LoadCaveRegion(caveRegionsTexture, test0.CaveBiomeID);
-    CaveRegionFragGPU caveRegion1 = LoadCaveRegion(caveRegionsTexture, test1.CaveBiomeID);
-    CaveRegionFragGPU caveRegion2 = LoadCaveRegion(caveRegionsTexture, test2.CaveBiomeID);
+    FragCaveRegion caveRegion0 = LoadCaveRegion(caveRegionsTexture, test0.CaveBiomeID);
+    FragCaveRegion caveRegion1 = LoadCaveRegion(caveRegionsTexture, test1.CaveBiomeID);
+    FragCaveRegion caveRegion2 = LoadCaveRegion(caveRegionsTexture, test2.CaveBiomeID);
     
     //Defaults
     float surfaceOffset0 = surfaceRegion0.Floor - surfaceRegion0.Height;
     float surfaceOffset1 = surfaceRegion1.Floor - surfaceRegion1.Height;
     float surfaceOffset2 = surfaceRegion2.Floor - surfaceRegion2.Height;
     
-    GradientFragGPU SurfaceGroundGradient = surfaceRegion0.GroundGradient;
-    GradientFragGPU SurfaceWallGradient = surfaceRegion0.WallGradient;
-    GradientFragGPU CaveGroundGradient = caveRegion0.GroundGradient;
-    GradientFragGPU CaveWallGradient = caveRegion0.WallGradient;
+    FragGradient SurfaceGroundGradient = surfaceRegion0.GroundGradient;
+    FragGradient SurfaceWallGradient = surfaceRegion0.WallGradient;
+    FragGradient CaveGroundGradient = caveRegion0.GroundGradient;
+    FragGradient CaveWallGradient = caveRegion0.WallGradient;
     
     float surfaceHeight = surfaceRegion0.Height;
     float surfaceFloor = surfaceRegion0.Floor;

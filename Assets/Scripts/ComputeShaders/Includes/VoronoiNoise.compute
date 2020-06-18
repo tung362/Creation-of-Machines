@@ -1,0 +1,57 @@
+﻿#ifndef Voronoi_Noise_
+#define Voronoi_Noise_
+
+#include "Terrain.compute"
+
+/*Utils*/
+float Voronoi(float x, float y, int regionsCount, StructuredBuffer<GPURegion> regions, out int outputRegionIndexes[3])
+{
+	//Get the 3 closest regions, brute-force method, need to create kdtrees
+    float closestDistance = 999999;
+    float secondClosestDistance = 999999;
+    float thirdClosestDistance = 999999;
+    float2 closestSiteCoord;
+    float2 secondClosestSiteCoord;
+    float2 thirdClosestSiteCoord;
+    for (int i = 0; i < regionsCount; i++)
+    {
+        float dist = distance(regions[i].Coord, float2(x, y));
+
+        if (dist < closestDistance)
+        {
+            thirdClosestDistance = secondClosestDistance;
+            thirdClosestSiteCoord = secondClosestSiteCoord;
+            outputRegionIndexes[2] = outputRegionIndexes[1];
+
+            secondClosestDistance = closestDistance;
+            secondClosestSiteCoord = closestSiteCoord;
+            outputRegionIndexes[1] = outputRegionIndexes[0];
+
+            closestDistance = dist;
+            closestSiteCoord = regions[i].Coord;
+            outputRegionIndexes[0] = i;
+
+        }
+
+        if (dist < secondClosestDistance && dist > closestDistance)
+        {
+            thirdClosestDistance = secondClosestDistance;
+            thirdClosestSiteCoord = secondClosestSiteCoord;
+            outputRegionIndexes[2] = outputRegionIndexes[1];
+
+            secondClosestDistance = dist;
+            secondClosestSiteCoord = regions[i].Coord;
+            outputRegionIndexes[1] = i;
+        }
+
+        if (dist < thirdClosestDistance && dist > secondClosestDistance)
+        {
+            thirdClosestDistance = dist;
+            thirdClosestSiteCoord = regions[i].Coord;
+            outputRegionIndexes[2] = i;
+        }
+    }
+
+    return 1 - (closestDistance / secondClosestDistance);
+}
+#endif

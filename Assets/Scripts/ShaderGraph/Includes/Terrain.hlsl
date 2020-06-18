@@ -10,22 +10,22 @@ static const int CaveRegionSize = 18;
 static const int RegionMapSize = 11;
 
 /*Structs*/
-struct SurfaceRegionFragGPU
+struct FragSurfaceRegion
 {
     float Height;
     float Floor;
     float AdditiveHeightLimit;
-    GradientFragGPU GroundGradient;
-    GradientFragGPU WallGradient;
+    FragGradient GroundGradient;
+    FragGradient WallGradient;
 };
 
-struct CaveRegionFragGPU
+struct FragCaveRegion
 {
-    GradientFragGPU GroundGradient;
-    GradientFragGPU WallGradient;
+    FragGradient GroundGradient;
+    FragGradient WallGradient;
 };
 
-struct RegionMapFragGPU
+struct FragRegionMap
 {
     float2 Coord;
     int SurfaceBiomeID;
@@ -58,10 +58,10 @@ int GetRegionMapIndex(int regionIndex)
 
 /*Load from texture*/
 //Surface Region
-SurfaceRegionFragGPU LoadSurfaceRegion(Texture2D dataTexture, int index, out int nextIndex)
+FragSurfaceRegion LoadSurfaceRegion(Texture2D dataTexture, int index, out int nextIndex)
 {
     nextIndex = index;
-    SurfaceRegionFragGPU retVal;
+    FragSurfaceRegion retVal;
     retVal.Height = DecodeFloat(dataTexture, nextIndex, nextIndex);
     retVal.Floor = DecodeFloat(dataTexture, nextIndex, nextIndex);
     retVal.AdditiveHeightLimit = DecodeFloat(dataTexture, nextIndex, nextIndex);
@@ -70,33 +70,33 @@ SurfaceRegionFragGPU LoadSurfaceRegion(Texture2D dataTexture, int index, out int
     return retVal;
 }
 
-SurfaceRegionFragGPU LoadSurfaceRegion(Texture2D dataTexture, int regionIndex)
+FragSurfaceRegion LoadSurfaceRegion(Texture2D dataTexture, int regionIndex)
 {
     int index = GetSurfaceRegionIndex(regionIndex);
     return LoadSurfaceRegion(dataTexture, index, index);
 }
 
 //Cave Region
-CaveRegionFragGPU LoadCaveRegion(Texture2D dataTexture, int index, out int nextIndex)
+FragCaveRegion LoadCaveRegion(Texture2D dataTexture, int index, out int nextIndex)
 {
     nextIndex = index;
-    CaveRegionFragGPU retVal;
+    FragCaveRegion retVal;
     retVal.GroundGradient = LoadGradient(dataTexture, nextIndex, nextIndex);
     retVal.WallGradient = LoadGradient(dataTexture, nextIndex, nextIndex);
     return retVal;
 }
 
-CaveRegionFragGPU LoadCaveRegion(Texture2D dataTexture, int regionIndex)
+FragCaveRegion LoadCaveRegion(Texture2D dataTexture, int regionIndex)
 {
     int index = GetCaveRegionIndex(regionIndex);
     return LoadCaveRegion(dataTexture, index, index);
 }
 
 //Region Map
-RegionMapFragGPU LoadRegionMap(Texture2D dataTexture, int index, out int nextIndex)
+FragRegionMap LoadRegionMap(Texture2D dataTexture, int index, out int nextIndex)
 {
     nextIndex = index;
-    RegionMapFragGPU retVal;
+    FragRegionMap retVal;
     retVal.Coord = DecodeFloat2(dataTexture, nextIndex, nextIndex);
     retVal.SurfaceBiomeID = DecodeFloat(dataTexture, nextIndex, nextIndex);
     retVal.CaveBiomeID = DecodeFloat(dataTexture, nextIndex, nextIndex);
@@ -111,7 +111,7 @@ RegionMapFragGPU LoadRegionMap(Texture2D dataTexture, int index, out int nextInd
     return retVal;
 }
 
-RegionMapFragGPU LoadRegionMap(Texture2D dataTexture, int regionIndex)
+FragRegionMap LoadRegionMap(Texture2D dataTexture, int regionIndex)
 {
     int index = GetRegionMapIndex(regionIndex);
     return LoadRegionMap(dataTexture, index, index);

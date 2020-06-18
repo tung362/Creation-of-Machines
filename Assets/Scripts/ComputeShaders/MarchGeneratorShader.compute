@@ -1,29 +1,26 @@
-﻿#pragma kernel GenerateChunk
-#include "/Includes/Math.compute"
-#include "/Includes/MarchingCube.compute"
+﻿#ifndef March_Generator_
+#define March_Generator_
 
-struct TriangleGPU
-{
-    float3 vertexA;
-    float3 vertexB;
-    float3 vertexC;
-};
+#pragma kernel MarchGenerator
+#include "Includes/Mapper.compute"
+#include "Includes/GPUTriangle.compute"
+#include "Includes/MarchingCubes.compute"
 
 /*Output*/
-AppendStructuredBuffer<TriangleGPU> Triangles;
+AppendStructuredBuffer<GPUTriangle> Triangles;
 
-/*Shared data*/
-RWStructuredBuffer<float4> NoisePoints;
-float IsoSurface;
+/*Inputs*/
+int3 ThreadDimensions;
 float CubesPerAxis;
+RWStructuredBuffer<float4> NoisePoints;
 
 float3 VertLerp(float4 vertex1, float4 vertex2)
 {
-    return vertex1.xyz + (IsoSurface - vertex1.w) * (vertex2.xyz - vertex1.xyz) / (vertex2.w - vertex1.w);
+    return vertex1.xyz + (0 - vertex1.w) * (vertex2.xyz - vertex1.xyz) / (vertex2.w - vertex1.w);
 }
 
 [numthreads(8, 8, 8)]
-void GenerateChunk(uint3 id : SV_DispatchThreadID)
+void MarchGenerator(uint3 id : SV_DispatchThreadID)
 {
     //Prevents out of bounds
     if (id.x >= CubesPerAxis - 1 || id.y >= CubesPerAxis - 1 || id.z >= CubesPerAxis - 1) return;
@@ -32,28 +29,19 @@ void GenerateChunk(uint3 id : SV_DispatchThreadID)
     float4 cornerNodes[8] =
     {
         //Bottom
-        NoisePoints[IndexByCoord(id.x, id.y, id.z)],
-        NoisePoints[IndexByCoord(id.x + 1, id.y, id.z)],
-        NoisePoints[IndexByCoord(id.x + 1, id.y, id.z + 1)],
-        NoisePoints[IndexByCoord(id.x, id.y, id.z + 1)],
+        NoisePoints[IndexByCoord(id.x, id.y, id.z, ThreadDimensions)],
+        NoisePoints[IndexByCoord(id.x + 1, id.y, id.z, ThreadDimensions)],
+        NoisePoints[IndexByCoord(id.x + 1, id.y, id.z + 1, ThreadDimensions)],
+        NoisePoints[IndexByCoord(id.x, id.y, id.z + 1, ThreadDimensions)],
         //Top
-        NoisePoints[IndexByCoord(id.x, id.y + 1, id.z)],
-        NoisePoints[IndexByCoord(id.x + 1, id.y + 1, id.z)],
-        NoisePoints[IndexByCoord(id.x + 1, id.y + 1, id.z + 1)],
-        NoisePoints[IndexByCoord(id.x, id.y + 1, id.z + 1)]
+        NoisePoints[IndexByCoord(id.x, id.y + 1, id.z, ThreadDimensions)],
+        NoisePoints[IndexByCoord(id.x + 1, id.y + 1, id.z, ThreadDimensions)],
+        NoisePoints[IndexByCoord(id.x + 1, id.y + 1, id.z + 1, ThreadDimensions)],
+        NoisePoints[IndexByCoord(id.x, id.y + 1, id.z + 1, ThreadDimensions)]
     };
 
     //Find unique index for cube combination
     int triTableIndex = 0;
-    //if (cornerNodes[0].w < IsoSurface) triTableIndex |= 1;
-    //if (cornerNodes[1].w < IsoSurface) triTableIndex |= 2;
-    //if (cornerNodes[2].w < IsoSurface) triTableIndex |= 4;
-    //if (cornerNodes[3].w < IsoSurface) triTableIndex |= 8;
-    //if (cornerNodes[4].w < IsoSurface) triTableIndex |= 16;
-    //if (cornerNodes[5].w < IsoSurface) triTableIndex |= 32;
-    //if (cornerNodes[6].w < IsoSurface) triTableIndex |= 64;
-    //if (cornerNodes[7].w < IsoSurface) triTableIndex |= 128;
-
     if (cornerNodes[0].w < 0.5f) triTableIndex |= 1;
     if (cornerNodes[1].w < 0.5f) triTableIndex |= 2;
     if (cornerNodes[2].w < 0.5f) triTableIndex |= 4;
@@ -74,7 +62,7 @@ void GenerateChunk(uint3 id : SV_DispatchThreadID)
         int vertex3NodeA = VerticeNodeToCornerNodeIndex[TriTable[triTableIndex][i + 2]][0];
         int vertex3NodeB = VerticeNodeToCornerNodeIndex[TriTable[triTableIndex][i + 2]][1];
 
-        TriangleGPU tri;
+        GPUTriangle tri;
         tri.vertexA = (cornerNodes[vertex1NodeA].xyz + cornerNodes[vertex1NodeB].xyz) * 0.5f;
         tri.vertexB = (cornerNodes[vertex2NodeA].xyz + cornerNodes[vertex2NodeB].xyz) * 0.5f;
         tri.vertexC = (cornerNodes[vertex3NodeA].xyz + cornerNodes[vertex3NodeB].xyz) * 0.5f;
@@ -84,3 +72,4 @@ void GenerateChunk(uint3 id : SV_DispatchThreadID)
         Triangles.Append(tri);
     }
 }
+#endif

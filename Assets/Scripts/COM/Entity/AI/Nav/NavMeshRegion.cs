@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using NavMeshBuilder = UnityEngine.AI.NavMeshBuilder;
 //using System.Linq;
 
-namespace COM.AI
+namespace COM.Entity.AI
 {
     // Build and update a localized navmesh from the sources marked by NavMeshSourceTag
     [DefaultExecutionOrder(-102)]

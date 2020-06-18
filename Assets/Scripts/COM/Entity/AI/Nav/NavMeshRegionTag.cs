@@ -6,7 +6,7 @@ using System.Collections.Generic;
 //using System.Collections;
 using COM.Utils;
 
-namespace COM.AI
+namespace COM.Entity.AI
 {
     public enum BuildTypeEnum { Mesh, Terrain, Collider }
 

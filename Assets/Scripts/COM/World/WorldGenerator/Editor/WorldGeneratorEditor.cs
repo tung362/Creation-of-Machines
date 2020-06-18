@@ -8,6 +8,17 @@ namespace COM.World
     [CustomEditor(typeof(WorldGenerator))]
     public class WorldGeneratorEditor : Editor
     {
+        #region Format
+        public struct GPUEditorOutput
+        {
+            public const int Stride = 16;
+
+            public Vector2Int Coord;
+            public float VoronoiHeight;
+            public float VoronoiMatchHeight;
+        };
+        #endregion
+
         //targeted script data
         private WorldGenerator TargetedScript;
 
@@ -19,8 +30,8 @@ namespace COM.World
         private Texture2D PreviewRegionMatchTexture;
 
         //Voronoi data
-        private List<Region> Regions = new List<Region>();
-        private RegionGPU[] RegionGPUs;
+        private readonly List<Region> Regions = new List<Region>();
+        private GPURegion[] GPURegions;
 
         //Chunk generation data
         private int CurrentChunkX = 0;
@@ -68,13 +79,13 @@ namespace COM.World
             CurrentChunkY = 0;
 
             //Voronoi map
-            TargetedScript.GenerateVoronoiGraph(PreviewSize, Regions);
+            TargetedScript.VoronoiGenerator.Result(TargetedScript.MapSeed, PreviewSize, Regions);
 
             //Normal map
             TargetedScript.RandomizeMapRegions(Regions);
 
             //GPU
-            RegionGPUs = TargetedScript.CreateRegionGPUs(Regions);
+            GPURegions = GPURegion.CreateGPURegions(Regions);
 
             //Create texture
             PreviewVoronoiGrayscaleTexture = new Texture2D(PreviewSize.x, PreviewSize.y);
@@ -110,7 +121,7 @@ namespace COM.World
 
         void GeneratePreviewMapChunk(int ChunkCoordX, int ChunkCoordY)
         {
-            WGEditorOutputGPU[] normHeights = GenerateNoise(ChunkCoordX, ChunkCoordY, RegionGPUs);
+            GPUEditorOutput[] normHeights = GenerateNoise(ChunkCoordX, ChunkCoordY, GPURegions);
 
             for (int i = 0; i < normHeights.Length; i++)
             {
@@ -125,40 +136,31 @@ namespace COM.World
             PreviewRegionMatchTexture.Apply();
         }
 
-        public WGEditorOutputGPU[] GenerateNoise(int ChunkCoordX, int ChunkCoordY, RegionGPU[] mapRegionGPUs)
+        public GPUEditorOutput[] GenerateNoise(int ChunkCoordX, int ChunkCoordY, GPURegion[] gpuRegions)
         {
             //Run through a chunk of 8x8x8 grid tiles
             int threadNum = 8;
 
             //Outputs a Chunk of 8x8 pixels = 64
-            WGEditorOutputGPU[] heightOutputs = new WGEditorOutputGPU[64];
-
-            //Find bytes
-            int sizeOfPixelOutputs;
-            int sizeOfMapRegionGPUs;
-            unsafe
-            {
-                sizeOfPixelOutputs = sizeof(WGEditorOutputGPU);
-                sizeOfMapRegionGPUs = sizeof(RegionGPU);
-            }
+            GPUEditorOutput[] heightOutputs = new GPUEditorOutput[64];
 
             //Kernal
-            int kernel = TargetedScript.WGEditorShader.FindKernel("NoiseEditor");
+            int kernel = TargetedScript.WGEditorShader.FindKernel("EditorNoiseGenerator");
 
             //RWStructuredBuffer sets
-            ComputeBuffer heightBuffer = new ComputeBuffer(heightOutputs.Length, sizeOfPixelOutputs);
+            ComputeBuffer heightBuffer = new ComputeBuffer(heightOutputs.Length, GPUEditorOutput.Stride);
             heightBuffer.SetData(heightOutputs);
             TargetedScript.WGEditorShader.SetBuffer(kernel, "Heights", heightBuffer);
 
             //Sets
             TargetedScript.WGEditorShader.SetInts("ThreadDimensions", new int[3] { threadNum, threadNum, 1 });
             TargetedScript.WGEditorShader.SetInts("ChunkCoord", new int[3] { ChunkCoordX, ChunkCoordY, 1 });
-            TargetedScript.WGEditorShader.SetInt("Sites", mapRegionGPUs.Length);
+            TargetedScript.WGEditorShader.SetInt("RegionsCount", gpuRegions.Length);
 
             //StructuredBuffer sets
-            ComputeBuffer mapRegionGPUsBuffer = new ComputeBuffer(mapRegionGPUs.Length, sizeOfMapRegionGPUs);
-            mapRegionGPUsBuffer.SetData(mapRegionGPUs);
-            TargetedScript.WGEditorShader.SetBuffer(kernel, "MapRegions", mapRegionGPUsBuffer);
+            ComputeBuffer gpuRegionsBuffer = new ComputeBuffer(gpuRegions.Length, GPURegion.Stride);
+            gpuRegionsBuffer.SetData(gpuRegions);
+            TargetedScript.WGEditorShader.SetBuffer(kernel, "Regions", gpuRegionsBuffer);
 
             //Run kernal
             TargetedScript.WGEditorShader.Dispatch(kernel, threadNum, threadNum, 1);
@@ -168,7 +170,7 @@ namespace COM.World
 
             //Get rid of buffer data
             heightBuffer.Dispose();
-            mapRegionGPUsBuffer.Dispose();
+            gpuRegionsBuffer.Dispose();
 
             return heightOutputs;
         }

@@ -1,9 +1,14 @@
-﻿struct KeyFrameGPU
+﻿#ifndef Animation_Curve_
+#define Animation_Curve_
+
+/*Structs*/
+struct KeyFrameGPU
 {
     float FrameTime;
     float FrameValue;
 };
 
+/*Utils*/
 float Evaluate(float value, StructuredBuffer<KeyFrameGPU> keyframes, int keyframesCount)
 {
 	//If empty
@@ -28,3 +33,4 @@ float Evaluate(float value, StructuredBuffer<KeyFrameGPU> keyframes, int keyfram
     }
     return 0;
 }
+#endif

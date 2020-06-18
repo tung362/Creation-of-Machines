@@ -1,30 +1,9 @@
-﻿int3 ThreadDimensions;
+﻿#ifndef Math_
+#define Math_
 
-int IndexByCoord(int x, int y, int z)
-{
-    return (z * ThreadDimensions.x * ThreadDimensions.y) + (y * ThreadDimensions.x) + x;
-}
-
-int IndexByCoord(int x, int y, int z, int3 dim)
-{
-    return (z * dim.x * dim.y) + (y * dim.x) + x;
-}
-
-int3 CoordByIndex(int idx) 
-{
-    int z = idx / (ThreadDimensions.x * ThreadDimensions.y);
-    idx -= (z * ThreadDimensions.x * ThreadDimensions.y);
-    int y = idx / ThreadDimensions.x;
-    int x = idx % ThreadDimensions.x;
-    return int3(x, y, z);
-}
-
-float InverseLerp(float A, float B, float T)
+/*Utils*/
+float3 InverseLerp(float4 A, float4 B, float4 T)
 {
     return (T - A) / (B - A);
 }
-
-float3 InverseLerp(float3 A, float3 B, float3 T)
-{
-    return (T - A) / (B - A);
-}
+#endif
