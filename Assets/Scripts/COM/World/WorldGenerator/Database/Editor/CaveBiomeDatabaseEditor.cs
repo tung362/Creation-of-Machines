@@ -13,7 +13,7 @@ namespace COM.Database.World
             CaveBiomeDatabase targetedScript = (CaveBiomeDatabase)target;
 
             DrawDefaultInspector();
-            GUILayout.Label((targetedScript.CaveBiomes != null ? targetedScript.CaveBiomes.Count : 0) + " Registered Cave Biomes");
+            GUILayout.Label((targetedScript.Biomes != null ? targetedScript.Biomes.Count : 0) + " Registered Cave Biomes");
 
             EditorGUILayout.HelpBox("Removes everything", MessageType.Info);
             if (GUILayout.Button("Clear Database")) targetedScript.ClearDatabase();

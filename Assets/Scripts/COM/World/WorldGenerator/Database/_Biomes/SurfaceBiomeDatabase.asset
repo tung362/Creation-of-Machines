@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7643cafb61efaa64eb409805763b1517, type: 3}
   m_Name: SurfaceBiomeDatabase
   m_EditorClassIdentifier: 
-  SurfaceBiomes:
+  Biomes:
     array:
     - Name: Flat Grassland
       GroundPalette:
@@ -74,11 +74,14 @@ MonoBehaviour:
         m_NumColorKeys: 2
         m_NumAlphaKeys: 2
       Persistance: 0
-      SurfaceHeight: 3
-      SurfaceFloor: 0
-      SurfaceAdditiveHeight: 0
-      SurfaceAdditiveHeightLimit: 3
-      SurfaceAdditiveOffset: 0
+      Height: 3
+      Floor: 0
+      AdditiveHeight: 0
+      AdditiveHeightLimit: 3
+      AdditiveOffset: 0
+      DayColor: {r: 0, g: 0, b: 0, a: 0}
+      NightColor: {r: 0, g: 0, b: 0, a: 0}
+      WeatherEvents: []
     - Name: Flat Canyon
       GroundPalette:
         serializedVersion: 2
@@ -139,8 +142,11 @@ MonoBehaviour:
         m_NumColorKeys: 2
         m_NumAlphaKeys: 2
       Persistance: 0.53
-      SurfaceHeight: 3
-      SurfaceFloor: 0
-      SurfaceAdditiveHeight: 84
-      SurfaceAdditiveHeightLimit: 7
-      SurfaceAdditiveOffset: -20
+      Height: 3
+      Floor: 0
+      AdditiveHeight: 84
+      AdditiveHeightLimit: 7
+      AdditiveOffset: -20
+      DayColor: {r: 0, g: 0, b: 0, a: 0}
+      NightColor: {r: 0, g: 0, b: 0, a: 0}
+      WeatherEvents: []

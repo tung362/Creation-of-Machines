@@ -13,7 +13,7 @@ namespace COM.Database.World
             SurfaceBiomeDatabase targetedScript = (SurfaceBiomeDatabase)target;
 
             DrawDefaultInspector();
-            GUILayout.Label((targetedScript.SurfaceBiomes != null ? targetedScript.SurfaceBiomes.Count : 0) + " Registered Surface Biomes");
+            GUILayout.Label((targetedScript.Biomes != null ? targetedScript.Biomes.Count : 0) + " Registered Surface Biomes");
 
             EditorGUILayout.HelpBox("Removes everything", MessageType.Info);
             if (GUILayout.Button("Clear Database")) targetedScript.ClearDatabase();

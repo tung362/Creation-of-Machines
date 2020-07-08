@@ -6,6 +6,9 @@ using Malee.List;
 
 namespace COM.Database.World
 {
+    /// <summary>
+    /// Database of all registered cave biomes
+    /// </summary>
     [CreateAssetMenu(menuName = "Creation of Machines/Cave Biome Database", fileName = "CaveBiomeDatabase.asset")]
     public class CaveBiomeDatabase : ScriptableObject, ISerializationCallbackReceiver
     {
@@ -31,7 +34,7 @@ namespace COM.Database.World
         #endregion
 
         [Reorderable]
-        public CaveBiomeList CaveBiomes = new CaveBiomeList();
+        public CaveBiomeList Biomes = new CaveBiomeList();
 
         public void OnBeforeSerialize()
         {
@@ -51,7 +54,7 @@ namespace COM.Database.World
 
         public void ClearDatabase(bool save = true)
         {
-            CaveBiomes = new CaveBiomeList();
+            Biomes = new CaveBiomeList();
 
             //Save
             if (save) Save();

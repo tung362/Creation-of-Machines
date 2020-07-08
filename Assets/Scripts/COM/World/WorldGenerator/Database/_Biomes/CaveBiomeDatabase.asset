@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: de1bf0d8a0cae8249be10fa0d5c5ca92, type: 3}
   m_Name: CaveBiomeDatabase
   m_EditorClassIdentifier: 
-  CaveBiomes:
+  Biomes:
     array:
     - Name: Cavern
       GroundPalette:
@@ -74,7 +74,7 @@ MonoBehaviour:
         m_NumColorKeys: 2
         m_NumAlphaKeys: 2
       Persistance: 0.53
-      CaveThreshold: 0.43
+      Threshold: 0.43
     - Name: Underground Forest
       GroundPalette:
         serializedVersion: 2
@@ -135,4 +135,4 @@ MonoBehaviour:
         m_NumColorKeys: 2
         m_NumAlphaKeys: 2
       Persistance: 0
-      CaveThreshold: 0.43
+      Threshold: 0.43

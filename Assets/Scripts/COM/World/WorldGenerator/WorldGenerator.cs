@@ -13,8 +13,8 @@ namespace COM.World
         public static WorldGenerator instance { get; private set; }
 
         [Header("Database")]
-        public SurfaceBiomeDatabase surfaceBiomeDatabase;
-        public CaveBiomeDatabase caveBiomeDatabase;
+        public SurfaceBiomeDatabase SurfaceBiomes;
+        public CaveBiomeDatabase CaveBiomes;
 
         [Header("Editor Settings")]
         public ComputeShader WGEditorShader;
@@ -66,12 +66,12 @@ namespace COM.World
             RandomizeMapRegions(Regions);
 
             /*Generator setup*/
-            NoiseGenerator.Init(MapSeed, CubesPerAxis, ChunkSize, surfaceBiomeDatabase.SurfaceBiomes, caveBiomeDatabase.CaveBiomes, Regions);
+            NoiseGenerator.Init(MapSeed, CubesPerAxis, ChunkSize, SurfaceBiomes.Biomes, CaveBiomes.Biomes, Regions);
             MarchGenerator.Init(CubesPerAxis);
 
             /*Encode generation data for fragment shader use*/
-            TerrainMaterial.SetTexture("_SurfaceRegions", SurfaceRegionEncoder.CreateTexture(surfaceBiomeDatabase.SurfaceBiomes));
-            TerrainMaterial.SetTexture("_CaveRegions", CaveRegionEncoder.CreateTexture(caveBiomeDatabase.CaveBiomes));
+            TerrainMaterial.SetTexture("_SurfaceRegions", SurfaceRegionEncoder.CreateTexture(SurfaceBiomes.Biomes));
+            TerrainMaterial.SetTexture("_CaveRegions", CaveRegionEncoder.CreateTexture(CaveBiomes.Biomes));
             TerrainMaterial.SetTexture("_RegionMap", RegionMapEncoder.CreateTexture(Regions));
 
             /*Debug*/
@@ -131,8 +131,8 @@ namespace COM.World
             {
                 //Generate names
                 //Randomizes surface and cave biomes for each region
-                mapRegions[i].SurfaceBiomeID = Random.Range(0, surfaceBiomeDatabase.SurfaceBiomes.Count);
-                mapRegions[i].CaveBiomeID = Random.Range(0, caveBiomeDatabase.CaveBiomes.Count);
+                mapRegions[i].SurfaceBiomeID = Random.Range(0, SurfaceBiomes.Biomes.Count);
+                mapRegions[i].CaveBiomeID = Random.Range(0, CaveBiomes.Biomes.Count);
             }
         }
         #endregion

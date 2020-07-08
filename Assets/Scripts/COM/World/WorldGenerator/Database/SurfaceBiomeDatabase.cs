@@ -3,9 +3,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using Malee.List;
+using COM.World;
 
 namespace COM.Database.World
 {
+    /// <summary>
+    /// Database of all registered surface biomes
+    /// </summary>
     [CreateAssetMenu(menuName = "Creation of Machines/Surface Biome Database", fileName = "SurfaceBiomeDatabase.asset")]
     public class SurfaceBiomeDatabase : ScriptableObject, ISerializationCallbackReceiver
     {
@@ -31,11 +35,17 @@ namespace COM.Database.World
             public float AdditiveHeightLimit;
             public float AdditiveOffset;
             //Subtractive
+            //Environment
+            [ColorUsage(true, true)]
+            public Color DayColor;
+            [ColorUsage(true, true)]
+            public Color NightColor;
+            public List<WeatherEvent> WeatherEvents;
         }
         #endregion
 
         [Reorderable]
-        public SurfaceBiomeList SurfaceBiomes = new SurfaceBiomeList();
+        public SurfaceBiomeList Biomes = new SurfaceBiomeList();
 
         public void OnBeforeSerialize()
         {
@@ -55,7 +65,7 @@ namespace COM.Database.World
 
         public void ClearDatabase(bool save = true)
         {
-            SurfaceBiomes = new SurfaceBiomeList();
+            Biomes = new SurfaceBiomeList();
 
             //Save
             if (save) Save();
