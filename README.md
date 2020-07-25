@@ -13,7 +13,7 @@ Currently a game project i'm creating but for now it's more focused on procedura
   
 ### Old screenshots
 
-**marching cubes**
+**Marching cubes**
 ![alt text](https://cdn.discordapp.com/attachments/250127073597849600/709149663738986537/unknown.png)  
 ![alt text](https://media.discordapp.net/attachments/250127073597849600/709151886179303424/unknown.png)  
 ![alt text](https://media.discordapp.net/attachments/250127073597849600/709153201416306818/unknown.png)  
