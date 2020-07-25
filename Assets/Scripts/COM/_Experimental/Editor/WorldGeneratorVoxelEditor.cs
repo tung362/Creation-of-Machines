@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 
-namespace COM.World
+namespace COM.World.Experimental
 {
-    [CustomEditor(typeof(WorldGenerator))]
-    public class WorldGeneratorEditor : Editor
+    [CustomEditor(typeof(WorldGeneratorVoxel))]
+    public class WorldGeneratorVoxelEditor : Editor
     {
         #region Format
         public struct GPUEditorOutput
@@ -20,7 +20,7 @@ namespace COM.World
         #endregion
 
         //Targeted script data
-        private WorldGenerator TargetedScript;
+        private WorldGeneratorVoxel TargetedScript;
 
         //Settings
         public static Vector2Int PreviewSize = new Vector2Int(152, 152);
@@ -39,14 +39,14 @@ namespace COM.World
 
         void OnEnable()
         {
-            TargetedScript = (WorldGenerator)target;
+            TargetedScript = (WorldGeneratorVoxel)target;
             GeneratePreviewMap();
         }
 
         public override void OnInspectorGUI()
         {
             EditorGUILayout.LabelField("Map Size: " + TargetedScript.MapSize.x + "x" + TargetedScript.MapSize.y);
-            EditorGUILayout.LabelField("Number of Chunks: " + Mathf.CeilToInt((TargetedScript.MapSize.x / TargetedScript.ChunkSize) * (TargetedScript.MapSize.y / TargetedScript.ChunkSize)));
+            EditorGUILayout.LabelField("Number of Chunks: " + Mathf.CeilToInt((TargetedScript.MapSize.x / (TargetedScript.CubesPerAxis * TargetedScript.CubeSize)) * (TargetedScript.MapSize.y / (TargetedScript.CubesPerAxis * TargetedScript.CubeSize))));
 
             EditorGUI.BeginChangeCheck();
             DrawDefaultInspector();

@@ -148,6 +148,7 @@ float BiomeBlend(float voronoiBaseHeight, float3 coord, StructuredBuffer<GPURegi
     //Subtractive map
     float subHeight = Perlin(coord.x, coord.y, coord.z, CaveScale, cavePersistance, CaveLacunarity, CaveOctaves, CaveOctaveOffsets);
 
+    //-1 = inside, 1 = outside
     //Surface
     float noise = (coord.y - surfaceFloor) + normHeight * surfaceHeight;
 
@@ -164,6 +165,11 @@ float BiomeBlend(float voronoiBaseHeight, float3 coord, StructuredBuffer<GPURegi
 
     //Cave
     if (subHeight >= caveThreshold) noise = 1;
+    //if ((1 + subHeight) > 0) noise += (1 + subHeight) * 10;
+    //if ((subHeight + 1) > 0)
+    //{
+    //    if(noise < 0) noise -= (noise * subHeight + 1) * 10;
+    //}
     
     return noise;
 }

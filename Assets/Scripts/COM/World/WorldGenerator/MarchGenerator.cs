@@ -1,7 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using COM.Database.World;
 using COM.Utils;
 
 namespace COM.World
@@ -9,27 +8,17 @@ namespace COM.World
     /// <summary>
     /// GPGPU marching cubes mesh generator
     /// </summary>
-    public class ChunkMarchGenerator : MonoBehaviour
+    [System.Serializable]
+    public class MarchGenerator
     {
         public ComputeShader ChunkShader;
 
         /*Cache*/
         private int Kernel = -1;
 
-        void OnDestroy()
-        {
-            Dispose();
-        }
-
         #region Setup
         public void Init(int cubesPerAxis)
         {
-            if(!ChunkShader)
-            {
-                Debug.Log("Warning! Nothing is attacted to \"ChunkShader\", @ChunkGenerator");
-                return;
-            }
-
             //Kernal
             Kernel = ChunkShader.FindKernel("MarchGenerator");
 
@@ -40,15 +29,10 @@ namespace COM.World
         #endregion
 
         #region Output
-        public (Vector3[], int[], FragRegionIndex)? Result(int chunkCoordX, int chunkCoordY, int chunkCoordZ, int cubesPerAxis, ChunkNoiseGenerator noiseGenerator)
+        public (Vector3[], int[], FragRegionIndex) Result(int chunkCoordX, int chunkCoordY, int chunkCoordZ, int cubesPerAxis, MarchNoiseGenerator noiseGenerator)
         {
             //Run noise kernal
-            (ComputeBuffer, FragRegionIndex)? noiseShader = noiseGenerator.Result(chunkCoordX, chunkCoordY, chunkCoordZ, cubesPerAxis);
-            if (Kernel == -1 || !noiseShader.HasValue)
-            {
-                Debug.Log("Warning! Not initialized, @ChunkGenerator");
-                return null;
-            }
+            (ComputeBuffer, FragRegionIndex) noiseShader = noiseGenerator.Result(chunkCoordX, chunkCoordY, chunkCoordZ, cubesPerAxis);
 
             //Max TriangleGPU count inside a chunk, 5 possible triangles inside of TriTable, 3 pairs per triangle
             int maxTriangleGPUCount = (cubesPerAxis * cubesPerAxis * cubesPerAxis) * 5;
@@ -63,8 +47,7 @@ namespace COM.World
             ChunkShader.SetBuffer(Kernel, "Triangles", trianglesBuffer);
 
             //StructuredBuffer sets
-            ComputeBuffer noisePointsBuffer = noiseShader.Value.Item1;
-            ChunkShader.SetBuffer(Kernel, "NoisePoints", noisePointsBuffer);
+            ChunkShader.SetBuffer(Kernel, "NoisePoints", noiseShader.Item1);
 
             //Run kernal
             ChunkShader.Dispatch(Kernel, processPerThread, processPerThread, processPerThread);
@@ -85,7 +68,7 @@ namespace COM.World
             //Get rid of buffer data
             trianglesBuffer.Dispose();
             triCountBuffer.Dispose();
-            noisePointsBuffer.Dispose();
+            noiseShader.Item1.Dispose();
 
             //Process triangles
             for (int i = 0; i < triangleGPUOutput.Length; i++)
@@ -99,12 +82,12 @@ namespace COM.World
                 trianglesOutput[(i * 3) + 2] = (i * 3) + 2;
             }
 
-            return (verticesOutput, trianglesOutput, noiseShader.Value.Item2);
+            return (verticesOutput, trianglesOutput, noiseShader.Item2);
         }
         #endregion
 
         #region Utils
-        void Dispose()
+        public void Dispose()
         {
 
         }

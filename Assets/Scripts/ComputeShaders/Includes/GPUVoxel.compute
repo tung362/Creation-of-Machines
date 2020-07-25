@@ -1,0 +1,33 @@
+﻿#ifndef GPU_Voxel_
+#define GPU_Voxel_
+
+/*Structs*/
+struct GPUVoxel
+{
+    //0 = solid, 1 = face left, 2 = face forward, 3 = face right, 4 = face backward, 5 = face up, 6 = face down
+    int FlagMask;
+    
+    bool HasFlag(int flag)
+    {
+        return ((int)FlagMask & 1 << (int)flag) != 0;
+    }
+
+    void AddFlag(int flag)
+    {
+        FlagMask |= (int)(1 << (int)flag);
+    }
+
+    void RemoveFlag(int flag)
+    {
+        FlagMask &= (int)(~(int)(1 << (int)flag));
+    }
+};
+
+/*Utils*/
+GPUVoxel Voxel()
+{
+    GPUVoxel voxel;
+    voxel.FlagMask = 0;
+    return voxel;
+}
+#endif

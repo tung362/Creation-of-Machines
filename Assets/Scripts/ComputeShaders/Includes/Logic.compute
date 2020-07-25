@@ -1,0 +1,54 @@
+﻿#ifndef Logic_
+#define Logic_
+
+/*If statement operators, 0 = false, 1 = true*/
+float4 IfEqual(float4 x, float4 y)
+{
+    return 1.0 - abs(sign(x - y));
+}
+
+float4 IfNotEqual(float4 x, float4 y)
+{
+    return abs(sign(x - y));
+}
+
+float4 IfGreater(float4 x, float4 y)
+{
+    return max(sign(x - y), 0.0);
+}
+
+float4 IfLess(float4 x, float4 y)
+{
+    return max(sign(y - x), 0.0);
+}
+
+float4 IFGreaterOrEqual(float4 x, float4 y)
+{
+    return 1.0 - IfLess(x, y);
+}
+
+float4 IFLessOrEqual(float4 x, float4 y)
+{
+    return 1.0 - IfGreater(x, y);
+}
+
+float4 And(float4 a, float4 b)
+{
+    return a * b;
+}
+
+float4 Or(float4 a, float4 b)
+{
+    return min(a + b, 1.0);
+}
+
+float4 XOr(float4 a, float4 b)
+{
+    return (a + b) % 2.0;
+}
+
+float4 Not(float4 a)
+{
+    return 1.0 - a;
+}
+#endif

@@ -5,14 +5,14 @@ using csDelaunay;
 using COM.Database.World;
 using COM.Utils.World;
 
-namespace COM.World
+namespace COM.World.Experimental
 {
     /// <summary>
-    /// Terrain generator using the marching cubes model
+    /// Terrain generator using the voxels model
     /// </summary>
-    public class WorldGenerator : MonoBehaviour
+    public class WorldGeneratorVoxel : MonoBehaviour
     {
-        public static WorldGenerator instance { get; private set; }
+        public static WorldGeneratorVoxel instance { get; private set; }
 
         [Header("Editor")]
         public ComputeShader WGEditorShader;
@@ -25,22 +25,23 @@ namespace COM.World
         public VoronoiGenerator VoronoiGenerator;
 
         [Header("Noise Generator")]
-        public MarchNoiseGenerator NoiseGenerator;
+        public VoxelNoiseGenerator NoiseGenerator;
 
-        [Header("March Generator")]
-        public MarchGenerator MarchGenerator;
+        [Header("Voxel Generator")]
+        public VoxelGenerator Generator;
 
         [Header("Generator Settings")]
         public string MapSeed = "Seed";
         public Vector2Int MapSize = new Vector2Int(152, 152);
         [Range(1, 100)]
         public int CubesPerAxis = 30;
-        public float ChunkSize = 10;
+        public float CubeSize = 0.0255f;
         public Material TerrainMaterial;
 
         [Header("Debug")]
         public int ViewSize = 1;
         public GameObject RegionBorderPrefab;
+        public Material TestMaterial;
         private List<MeshFilter> TestChunks = new List<MeshFilter>();
 
         /*Cache*/
@@ -69,8 +70,8 @@ namespace COM.World
             RandomizeMapRegions(Regions);
 
             /*Generator setup*/
-            NoiseGenerator.Init(MapSeed, CubesPerAxis, ChunkSize, SurfaceBiomes.Biomes, CaveBiomes.Biomes, Regions);
-            MarchGenerator.Init(CubesPerAxis);
+            NoiseGenerator.Init(MapSeed, CubesPerAxis, CubeSize, SurfaceBiomes.Biomes, CaveBiomes.Biomes, Regions);
+            Generator.Init(CubesPerAxis, CubeSize);
 
             /*Encode generation data for fragment shader use*/
             TerrainMaterial.SetTexture("_SurfaceRegions", SurfaceRegionEncoder.CreateTexture(SurfaceBiomes.Biomes));
@@ -99,27 +100,35 @@ namespace COM.World
             //CreateChunk(0, -1, 1);
         }
 
+        void OnDestroy()
+        {
+            NoiseGenerator.Dispose();
+            Generator.Dispose();
+        }
+
         #region Generation
 
         void CreateChunk(int ChunkCoordX, int ChunkCoordY, int ChunkCoordZ)
         {
-            (Vector3[], int[], FragRegionIndex) meshData = MarchGenerator.Result(ChunkCoordX, ChunkCoordY, ChunkCoordZ, CubesPerAxis, NoiseGenerator);
+            (Vector3[], int[], FragRegionIndex) meshData = Generator.Result(ChunkCoordX, ChunkCoordY, ChunkCoordZ, CubesPerAxis, NoiseGenerator);
+            if (meshData.Item1.Length == 0) return;
 
             GameObject chunk = new GameObject();
             chunk.transform.parent = ChunkOrigin.transform;
-            chunk.transform.localPosition = new Vector3(ChunkCoordX, ChunkCoordY, ChunkCoordZ) * ChunkSize;
+            chunk.transform.localPosition = new Vector3(ChunkCoordX, ChunkCoordY, ChunkCoordZ) * (3 * (CubesPerAxis * CubeSize));
             MeshFilter chunkMF = chunk.AddComponent<MeshFilter>();
             MeshRenderer chunkMR = chunk.AddComponent<MeshRenderer>();
             MeshCollider chunkMC = chunk.AddComponent<MeshCollider>();
 
             chunkMR.material = TerrainMaterial;
+            //chunkMR.material = TestMaterial;
 
             chunkMR.material.SetInt("_BiomeIndex0", meshData.Item3.Index0);
             chunkMR.material.SetInt("_BiomeIndex1", meshData.Item3.Index1);
             chunkMR.material.SetInt("_BiomeIndex2", meshData.Item3.Index2);
             chunkMR.material.SetInt("_BiomeIndex3", meshData.Item3.Index3);
 
-            Mesh mesh = new Mesh
+            Mesh mesh = new Mesh()
             {
                 vertices = meshData.Item1,
                 triangles = meshData.Item2
@@ -131,7 +140,6 @@ namespace COM.World
         #endregion
 
         #region Utils
-
         public void RandomizeMapRegions(List<Region> mapRegions)
         {
             Random.InitState(MapSeed.GetHashCode());

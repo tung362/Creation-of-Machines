@@ -1,0 +1,105 @@
+﻿#ifndef Face_Generator_
+#define Face_Generator_
+
+#pragma kernel FaceGenerator
+#include "Includes/Mapper.compute"
+#include "Includes/GPUVoxel.compute"
+#include "Includes/GPURectangle.compute"
+
+/*Output*/
+AppendStructuredBuffer<GPURectangle> Rectangles;
+RWStructuredBuffer<GPUVoxel> Voxels;
+
+/*Inputs*/
+int3 VoxelDimensions;
+float CubeSize;
+int CubesPerAxis;
+int3 SubChunkCoord;
+
+[numthreads(8, 1, 1)]
+void FaceGenerator(uint3 id : SV_DispatchThreadID)
+{
+    //Prevents out of bounds
+    if (id.x >= (uint)CubesPerAxis || id.y >= 1u || id.z >= 1u) return;
+    
+    int width[30][30];
+    int height[30][30];
+    
+    //Loop through until all histogram rectangles of this layer is found
+    while (true)
+    {
+        //Fill arrays
+        for (int x1 = 0; x1 < 30; x1++)
+        {
+            for (int y1 = 0; y1 < 30; y1++)
+            {
+                width[x1][y1] = 0;
+                height[x1][y1] = 0;
+            }
+        }
+        
+        //Result
+        int rectArea = -1;
+        int4 rectDim;
+        
+        //Find largest histogram rectangle
+        for (int x = 0; x < CubesPerAxis; x++)
+        {
+            for (int y = 0; y < CubesPerAxis; y++)
+            {
+                //Skip
+                if (!Voxels[IndexByCoord(id.x, y, x, VoxelDimensions)].HasFlag(3)) continue;
+                
+                if (x == 0) height[x][y] = 1;
+                else height[x][y] = height[x - 1][y] + 1;
+                
+                if (y == 0) width[x][y] = 1;
+                else width[x][y] = width[x][y - 1] + 1;
+                
+                int minw = width[x][y];
+                for (int dh = 0; dh < height[x][y]; dh++)
+                {
+                    if (width[x - dh][y] < minw) minw = width[x - dh][y];
+
+                    int area = (dh + 1) * minw;
+                    if (area > rectArea)
+                    {
+                        rectArea = area;
+                        rectDim = float4(x - dh, y - minw + 1, x, y);
+                    }
+                }
+            }
+        }
+        
+        //Check if a histogram rectangle was found
+        if (rectArea != -1)
+        {
+            //Remove cells inside the histogram rectangle from the next search
+            for (int x2 = rectDim.x; x2 <= rectDim.z; x2++)
+            {
+                for (int y2 = rectDim.y; y2 <= rectDim.w; y2++)
+                {
+                    Voxels[IndexByCoord(id.x, y2, x2, VoxelDimensions)].RemoveFlag(3);
+                }
+            }
+            
+            float offset = CubeSize / 2;
+            float localAxis = (id.x * CubeSize) + offset;
+            float3 subChunkOffset = SubChunkCoord * (CubesPerAxis * CubeSize);
+            float2 vert0 = float2((rectDim.x * CubeSize) - offset, (rectDim.w * CubeSize) + offset);
+            float2 vert1 = float2((rectDim.z * CubeSize) + offset, (rectDim.w * CubeSize) + offset);
+            float2 vert2 = float2((rectDim.z * CubeSize) + offset, (rectDim.y * CubeSize) - offset);
+            float2 vert3 = float2((rectDim.x * CubeSize) - offset, (rectDim.y * CubeSize) - offset);
+            
+            //Create face vertices
+            GPURectangle Rect;
+            Rect.VertexA = float3(localAxis, vert0.y, vert0.x) + subChunkOffset;
+            Rect.VertexB = float3(localAxis, vert1.y, vert1.x) + subChunkOffset;
+            Rect.VertexC = float3(localAxis, vert2.y, vert2.x) + subChunkOffset;
+            Rect.VertexD = float3(localAxis, vert3.y, vert3.x) + subChunkOffset;
+            Rectangles.Append(Rect);
+        }
+        else break;
+    }
+}
+#endif

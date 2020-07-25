@@ -2,7 +2,7 @@
 #define Math_
 
 /*Utils*/
-float3 InverseLerp(float4 A, float4 B, float4 T)
+float4 InverseLerp(float4 A, float4 B, float4 T)
 {
     return (T - A) / (B - A);
 }

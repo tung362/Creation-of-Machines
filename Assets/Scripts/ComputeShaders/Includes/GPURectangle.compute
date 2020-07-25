@@ -1,0 +1,12 @@
+﻿#ifndef GPU_Rectangle_
+#define GPU_Rectangle_
+
+/*Structs*/
+struct GPURectangle
+{
+    float3 VertexA;
+    float3 VertexB;
+    float3 VertexC;
+    float3 VertexD;
+};
+#endif

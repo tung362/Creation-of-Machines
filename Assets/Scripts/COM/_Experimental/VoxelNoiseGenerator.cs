@@ -4,12 +4,13 @@ using UnityEngine;
 using COM.Database.World;
 using COM.Utils;
 
-namespace COM.World
+namespace COM.World.Experimental
 {
     /// <summary>
-    /// GPGPU density generator for the marching cubes algorithm using 3d perlin
+    /// GPGPU voxel density generator using 3d perlin
     /// </summary>
-    public class ChunkNoiseGenerator : MonoBehaviour
+    [System.Serializable]
+    public class VoxelNoiseGenerator
     {
         public ComputeShader NoiseShader;
 
@@ -28,11 +29,6 @@ namespace COM.World
 
         /*Cache*/
         private int Kernel = -1;
-        private Vector3[] SurfaceOctaveOffsets;
-        private Vector3[] CaveOctaveOffsets;
-        private GPUSurfaceBiome[] GPUSurfaceBiomes;
-        private GPUCaveBiome[] GPUCaveBiomes;
-        private GPURegion[] GPURegions;
 
         /*Compute buffers*/
         private ComputeBuffer SurfaceOctaveOffsetsBuffer;
@@ -41,34 +37,23 @@ namespace COM.World
         private ComputeBuffer GPUCaveBiomesBuffer;
         private ComputeBuffer GPURegionsBuffer;
 
-        void OnDestroy()
-        {
-            Dispose();
-        }
-
         #region Setup
-        public void Init(string mapSeed, int cubesPerAxis, float chunkSize, SurfaceBiomeDatabase.SurfaceBiomeList surfaceBiomes, CaveBiomeDatabase.CaveBiomeList caveBiomes, List<Region> regions)
+        public void Init(string mapSeed, int cubesPerAxis, float cubeSize, SurfaceBiomeDatabase.SurfaceBiomeList surfaceBiomes, CaveBiomeDatabase.CaveBiomeList caveBiomes, List<Region> regions)
         {
-            if(!NoiseShader)
-            {
-                Debug.Log("Warning! Nothing is attacted to \"NoiseShader\", @ChunkNoiseGenerator");
-                return;
-            }
-
             //GPU
-            SurfaceOctaveOffsets = GenerateMapOctaveOffsets(mapSeed, false);
-            CaveOctaveOffsets = GenerateMapOctaveOffsets(mapSeed, true);
-            GPUSurfaceBiomes = GPUSurfaceBiome.CreateGPUSurfaceBiomes(surfaceBiomes);
-            GPUCaveBiomes = GPUCaveBiome.CreateGPUCaveBiomes(caveBiomes);
-            GPURegions = GPURegion.CreateGPURegions(regions);
+            Vector3[] SurfaceOctaveOffsets = GenerateMapOctaveOffsets(mapSeed, false);
+            Vector3[] CaveOctaveOffsets = GenerateMapOctaveOffsets(mapSeed, true);
+            GPUSurfaceBiome[] GPUSurfaceBiomes = GPUSurfaceBiome.CreateGPUSurfaceBiomes(surfaceBiomes);
+            GPUCaveBiome[] GPUCaveBiomes = GPUCaveBiome.CreateGPUCaveBiomes(caveBiomes);
+            GPURegion[] GPURegions = GPURegion.CreateGPURegions(regions);
 
             //Kernal
             Kernel = NoiseShader.FindKernel("NoiseGenerator");
 
             //Sets
-            NoiseShader.SetInts("ThreadDimensions", new int[3] { cubesPerAxis, cubesPerAxis, cubesPerAxis });
-            NoiseShader.SetFloat("ChunkSize", chunkSize);
-            NoiseShader.SetFloat("CubesPerAxis", cubesPerAxis);
+            NoiseShader.SetInts("VoxelDimensions", new int[3] { cubesPerAxis, cubesPerAxis, cubesPerAxis });
+            NoiseShader.SetFloat("CubeSize", cubeSize);
+            NoiseShader.SetInt("CubesPerAxis", cubesPerAxis);
             NoiseShader.SetInt("SurfaceOctaves", SurfaceOctaves);
             NoiseShader.SetFloat("SurfaceLacunarity", SurfaceLacunarity);
             NoiseShader.SetFloat("SurfaceScale", SurfaceScale);
@@ -99,14 +84,8 @@ namespace COM.World
         #endregion
 
         #region Output
-        public (ComputeBuffer, FragRegionIndex)? Result(int chunkCoordX, int chunkCoordY, int chunkCoordZ, int cubesPerAxis)
+        public ComputeBuffer Result(int chunkCoordX, int chunkCoordY, int chunkCoordZ, int cubesPerAxis, ref FragRegionIndex fragRegionIndex)
         {
-            if (Kernel == -1)
-            {
-                Debug.Log("Warning! Not initialized, @ChunkNoiseGenerator");
-                return null;
-            }
-
             //Total number of cubes inside a chunk
             int cubesPerChunk = cubesPerAxis * cubesPerAxis * cubesPerAxis;
             int indexesPerChunk = cubesPerAxis * cubesPerAxis;
@@ -115,9 +94,9 @@ namespace COM.World
             int processPerThread = Mathf.CeilToInt(cubesPerAxis / 8.0f);
 
             //RWStructuredBuffer sets
-            ComputeBuffer noisePointsBuffer = new ComputeBuffer(cubesPerChunk, Stride.Vector4Stride);
+            ComputeBuffer voxelsBuffer = new ComputeBuffer(cubesPerChunk, GPUVoxel.Stride);
             ComputeBuffer fragRegionIndexsBuffer = new ComputeBuffer(indexesPerChunk, Stride.IntStride);
-            NoiseShader.SetBuffer(Kernel, "NoisePoints", noisePointsBuffer);
+            NoiseShader.SetBuffer(Kernel, "Voxels", voxelsBuffer);
             NoiseShader.SetBuffer(Kernel, "RegionIndexes", fragRegionIndexsBuffer);
 
             //Sets
@@ -131,13 +110,6 @@ namespace COM.World
             fragRegionIndexsBuffer.GetData(fragRegionIndexOutput);
 
             //Process indexes for fragment shader
-            FragRegionIndex fragRegionIndex = new FragRegionIndex
-            {
-                Index0 = -1,
-                Index1 = -1,
-                Index2 = -1,
-                Index3 = -1,
-            };
             for (int i = 0; i < fragRegionIndexOutput.Length; i++)
             {
                 if (fragRegionIndex.Index0 == fragRegionIndexOutput[i]) continue;
@@ -172,7 +144,7 @@ namespace COM.World
             //Get rid of buffer data
             fragRegionIndexsBuffer.Dispose();
 
-            return (noisePointsBuffer, fragRegionIndex);
+            return voxelsBuffer;
         }
         #endregion
 
@@ -191,7 +163,7 @@ namespace COM.World
             return mapOctaveOffsets;
         }
 
-        void Dispose()
+        public void Dispose()
         {
             SurfaceOctaveOffsetsBuffer.Dispose();
             CaveOctaveOffsetsBuffer.Dispose();

@@ -32,6 +32,9 @@ namespace COM.World
                 CurrentTime = CycleTimer / CycleDuration;
             }
 
+            //Debug.Log(Vector3.Lerp(new Vector3(0, 0, 1), new Vector3(1, 0, 0), 0.5f));
+            //Debug.Log(Vector3.Distance(new Vector3(0, 1, 0), new Vector3(0.75f, 0.75f, 0.75f)));
+
             Sun.transform.rotation = Quaternion.Euler(360 * CurrentTime, 0, 0);
             //Sun.intensity = SunIntensity.Evaluate(CurrentTime);
             //Sun.color = SunColor.Evaluate(CurrentTime);

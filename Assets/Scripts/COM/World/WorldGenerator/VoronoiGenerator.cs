@@ -5,7 +5,11 @@ using csDelaunay;
 
 namespace COM.World
 {
-    public class ChunkVoronoiGenerator : MonoBehaviour
+    /// <summary>
+    /// Voronoi generator for creating map regions
+    /// </summary>
+    [System.Serializable]
+    public class VoronoiGenerator
     {
         #region Format
         public enum VoronoiGradientMaskType { None, Circle }

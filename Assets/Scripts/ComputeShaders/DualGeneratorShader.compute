@@ -1,7 +1,7 @@
-﻿#ifndef March_Generator_
-#define March_Generator_
+﻿#ifndef Dual_Generator_
+#define Dual_Generator_
 
-#pragma kernel MarchGenerator
+#pragma kernel DualGenerator
 #include "Includes/Mapper.compute"
 #include "Includes/GPUTriangle.compute"
 #include "Includes/MarchingCubes.compute"
@@ -14,13 +14,15 @@ int3 ThreadDimensions;
 float CubesPerAxis;
 RWStructuredBuffer<float4> NoisePoints;
 
-float3 Adaptation(float4 vertex1, float4 vertex2)
+float3 VertLerp(float4 vertex1, float4 vertex2)
 {
-    return vertex1.xyz + (0.0f - vertex1.w) * (vertex2.xyz - vertex1.xyz) / (vertex2.w - vertex1.w);
+    //return vertex1.xyz + (0 - vertex1.w) * (vertex2.xyz - vertex1.xyz) / (vertex2.w - vertex1.w);
+    float t = (0.5f - vertex1.w) / (vertex2.w - vertex1.w);
+    return vertex1.xyz + t * (vertex2.xyz - vertex1.xyz);
 }
 
 [numthreads(8, 8, 8)]
-void MarchGenerator(uint3 id : SV_DispatchThreadID)
+void DualGenerator(uint3 id : SV_DispatchThreadID)
 {
     //Prevents out of bounds
     if (id.x >= CubesPerAxis - 1 || id.y >= CubesPerAxis - 1 || id.z >= CubesPerAxis - 1) return;
@@ -42,14 +44,14 @@ void MarchGenerator(uint3 id : SV_DispatchThreadID)
 
     //Find unique index for cube combination
     int triTableIndex = 0;
-    if (cornerNodes[0].w < 0.0f) triTableIndex |= 1;
-    if (cornerNodes[1].w < 0.0f) triTableIndex |= 2;
-    if (cornerNodes[2].w < 0.0f) triTableIndex |= 4;
-    if (cornerNodes[3].w < 0.0f) triTableIndex |= 8;
-    if (cornerNodes[4].w < 0.0f) triTableIndex |= 16;
-    if (cornerNodes[5].w < 0.0f) triTableIndex |= 32;
-    if (cornerNodes[6].w < 0.0f) triTableIndex |= 64;
-    if (cornerNodes[7].w < 0.0f) triTableIndex |= 128;
+    if (cornerNodes[0].w < 0.5f) triTableIndex |= 1;
+    if (cornerNodes[1].w < 0.5f) triTableIndex |= 2;
+    if (cornerNodes[2].w < 0.5f) triTableIndex |= 4;
+    if (cornerNodes[3].w < 0.5f) triTableIndex |= 8;
+    if (cornerNodes[4].w < 0.5f) triTableIndex |= 16;
+    if (cornerNodes[5].w < 0.5f) triTableIndex |= 32;
+    if (cornerNodes[6].w < 0.5f) triTableIndex |= 64;
+    if (cornerNodes[7].w < 0.5f) triTableIndex |= 128;
 
     for (int i = 0; TriTable[triTableIndex][i] != -1; i += 3)
     {
@@ -66,9 +68,9 @@ void MarchGenerator(uint3 id : SV_DispatchThreadID)
         //tri.vertexA = (cornerNodes[vertex1NodeA].xyz + cornerNodes[vertex1NodeB].xyz) * 0.5f;
         //tri.vertexB = (cornerNodes[vertex2NodeA].xyz + cornerNodes[vertex2NodeB].xyz) * 0.5f;
         //tri.vertexC = (cornerNodes[vertex3NodeA].xyz + cornerNodes[vertex3NodeB].xyz) * 0.5f;
-        tri.vertexA = Adaptation(cornerNodes[vertex1NodeA], cornerNodes[vertex1NodeB]);
-        tri.vertexB = Adaptation(cornerNodes[vertex2NodeA], cornerNodes[vertex2NodeB]);
-        tri.vertexC = Adaptation(cornerNodes[vertex3NodeA], cornerNodes[vertex3NodeB]);
+        tri.vertexA = VertLerp(cornerNodes[vertex1NodeA], cornerNodes[vertex1NodeB]);
+        tri.vertexB = VertLerp(cornerNodes[vertex2NodeA], cornerNodes[vertex2NodeB]);
+        tri.vertexC = VertLerp(cornerNodes[vertex3NodeA], cornerNodes[vertex3NodeB]);
         Triangles.Append(tri);
     }
 }
