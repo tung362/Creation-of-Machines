@@ -1,5 +1,6 @@
 # Creation-of-Machines
-Chunk-base world generation from various generation models with voronoi biomes using compute shaders and shader graph.
+Chunk-base world generation from various generation models with voronoi biomes using compute shaders and shader graph.  
+
 Currently a game project i'm creating but for now it's more focused on procedural generation where i create and test different generation models for the up coming game.  
 
 ![alt text](https://media.discordapp.net/attachments/643683921258610740/736178145086144592/unknown.png)  
