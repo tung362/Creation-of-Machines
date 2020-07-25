@@ -6,7 +6,7 @@ Currently a game project i'm creating but for now it's more focused on procedura
 ![alt text](https://media.discordapp.net/attachments/643683921258610740/736178145086144592/unknown.png)  
 
 ### Generation Models: 
-- **marching cubes**  
+- **Marching cubes**  
 - **Voxels**  
 - **Dual Contouring**  
   - Need further research for initial implemention  
